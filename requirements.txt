@@ -1,0 +1,8 @@
+bottle
+celery[redis]
+diskcache
+filelock
+flower
+gunicorn
+pytest
+python-dateutil
