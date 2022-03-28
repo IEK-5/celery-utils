@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+import sys
+import json
+
+from celery_utils.app import CONFIGS
+
+
+if __name__ == '__main__':
+    if 1 == len(sys.argv):
+        print(json.dumps(CONFIGS))
+    elif 2 == len(sys.argv):
+        try:
+            print(json.dumps(CONFIGS[sys.argv[1]]))
+        except:
+            print("{} is not in configs!".format(sys.argv[1]),
+                  file=sys.stderr)
+            sys.exit(1)
+    elif 3 == len(sys.argv):
+        try:
+            print(CONFIGS[sys.argv[1]][sys.argv[2]])
+        except:
+            print("{}.{} is not in configs!"\
+                  .format(sys.argv[1],sys.argv[2]))
+            sys.exit(1)
+    else:
+        print("Give one or two arguments!", file=sys.stderr)
+        sys.exit(1)
