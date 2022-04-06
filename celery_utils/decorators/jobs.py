@@ -80,7 +80,10 @@ def call_decorator(cache = True,
                    get_args_locally = False,
                    debug_info = True,
                    debug_loglevel = 'debug',
-                   debug_info_kwargs = {}):
+                   debug_info_kwargs = {},
+                   add_calldocs = True,
+                   calldocs_kwargs = {},
+                   calldocs_others = []):
     """A decorator that produces chain of celery tasks
 
     :cache_args: arguments for cache.
@@ -93,6 +96,10 @@ def call_decorator(cache = True,
     print debug info for the called function. see kwargs in:
     ? celery_utils.decorators.debug_function_info.debug_decorator
 
+    :docs, docs_kwargs, docs_others:
+    sets ._call_docs attribute, allowing webserver to pass arguments,
+    determine default values and generate help page
+    ? celery_utils.decorators.call_docs.call_docs
     """
     def wrapper(fun):
         if debug_info:
@@ -111,5 +118,10 @@ def call_decorator(cache = True,
         @wraps(fun)
         def wrap(*args, **kwargs):
             return fun(*args, **kwargs)
+
+        if add_calldocs:
+            wrap._calldocs = calldocs(wrap, calldocs_kwargs,
+                                      calldocs_others)
+
         return wrap
     return wrapper
