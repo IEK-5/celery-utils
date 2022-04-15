@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# commands called: celery, jq, cu_configs
+
+
+function _defaults {
+    APP="celery_utils"
+
+    IF_DRYRUN=""
+}
+
+function _celery_worker_suffix {
+    echo --autoscale=$(cu_configs worker workers | jq -r .),0 \
+         --max-memory-per-child=$(cu_configs worker max_memory | jq -r .) \
+         --loglevel=$(cu_configs logging level | jq -r .) \
+         --logfile="$(cu_configs logs_path | jq -r .)/worker-%p%I.log" \
+         --events \
+         --without-mingle
+}
+
+
+function _generate_configs {
+    echo python3 - \<\<\<\ "'from celery_utils.configs.configs import write_config_wrt_git; write_config_wrt_git()'"
+}
+
+
+function _start_worker {
+    echo celery -A "$1" worker $(_celery_worker_suffix)
+}
+
+
+function _start_flower {
+    echo celery -A "$1" \
+         --broker=$(cu_configs redis_url | jq -r .) \
+         flower \
+         --port="$(cu_configs flower port | jq -r .)"
+}
+
+
+function _start_webserver {
+    echo python3 - \<\<\< "'import celery_utils.webserver.server'"
+}
+
+
+function print_help {
+    echo "Usage: $0 [command] [--option value]"
+    echo
+    echo "Commands:"
+    echo "    config      generate configuration file"
+    echo "    worker      start a worker"
+    echo "    webserver   start a webserver"
+    echo "    flower      start a flower service"
+    echo
+    echo "Options:"
+    echo
+    echo "    -h,--help    print this page"
+    echo
+    echo "    -a,--app    name of the app to run"
+    echo
+    echo "    -d,--dryrun  dry run: print commands to be executed"
+    echo
+}
+
+
+function parse_args {
+    while [[ $# -gt 0 ]]
+    do
+        case $1 in
+            -h|--help)
+                print_help
+                exit
+                ;;
+            -a|--app)
+                shift
+                APP="$1"
+                ;;
+            -d|--dryrun)
+                IF_DRYRUN="yes"
+                shift
+                ;;
+            -*|--*)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                COMMANDS+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
+
+
+COMMANDS=()
+parse_args $@
+
+CMD=""
+for COMM in ${COMMANDS[@]}
+do
+    case $COMM in
+        config)
+            CMD=$(_generate_configs)
+            break
+            ;;
+        worker)
+            CMD=$(_start_worker "${APP}")
+            break
+            ;;
+        webserver)
+            CMD=$(_start_webserver)
+            break
+            ;;
+        flower)
+            CMD=$(_start_flower "${APP}")
+            break
+            ;;
+        *)
+            echo "Unknown command: $COMM"
+            exit 1
+            ;;
+    esac
+done
+
+
+if [ ! -z "${IF_DRYRUN}" ]
+then
+    echo "${CMD}"
+    exit 0
+fi
+
+eval ${CMD}
