@@ -9,18 +9,26 @@ function _defaults {
     IF_DRYRUN=""
 }
 
+
+function _check_dependency {
+    for prog in "$@"
+    do
+        if ! command -v "${prog}" &> /dev/null
+        then
+            echo "${prog} is missing!"
+            exit 1
+        fi
+    done
+}
+
 function _celery_worker_suffix {
-    echo --autoscale=$(cu_configs worker workers | jq -r .),0 \
+    echo --queues=$(cu_configs worker queues | jq -r .) \
+         --autoscale=$(cu_configs worker workers | jq -r .),0 \
          --max-memory-per-child=$(cu_configs worker max_memory | jq -r .) \
          --loglevel=$(cu_configs logging level | jq -r .) \
          --logfile="$(cu_configs logs_path | jq -r .)/worker-%p%I.log" \
          --events \
          --without-mingle
-}
-
-
-function _generate_configs {
-    echo python3 - \<\<\<\ "'from celery_utils.configs.configs import write_config_wrt_git; write_config_wrt_git()'"
 }
 
 
@@ -46,16 +54,21 @@ function print_help {
     echo "Usage: $0 [command] [--option value]"
     echo
     echo "Commands:"
-    echo "    config      generate configuration file"
-    echo "    worker      start a worker"
-    echo "    webserver   start a webserver"
-    echo "    flower      start a flower service"
+    echo
+    echo "    worker       start a worker"
+    echo
+    echo "    webserver    start a webserver"
+    echo
+    echo "    flower       start a flower service"
     echo
     echo "Options:"
     echo
-    echo "    -h,--help    print this page"
+    echo "    -a,--app     name of the app to run"
+    echo "                 Default: \"${APP}\""
     echo
-    echo "    -a,--app    name of the app to run"
+    echo "Flags:"
+    echo
+    echo "    -h,--help    print this page"
     echo
     echo "    -d,--dryrun  dry run: print commands to be executed"
     echo
@@ -92,25 +105,25 @@ function parse_args {
 
 
 COMMANDS=()
+_defaults
 parse_args $@
 
 CMD=""
 for COMM in ${COMMANDS[@]}
 do
     case $COMM in
-        config)
-            CMD=$(_generate_configs)
-            break
-            ;;
         worker)
+            _check_dependency celery cu_configs jq
             CMD=$(_start_worker "${APP}")
             break
             ;;
         webserver)
+            _check_dependency python3 cu
             CMD=$(_start_webserver)
             break
             ;;
         flower)
+            _check_dependency celery cu_configs jq
             CMD=$(_start_flower "${APP}")
             break
             ;;
@@ -124,7 +137,7 @@ done
 
 if [ ! -z "${IF_DRYRUN}" ]
 then
-    echo "${CMD}"
+    echo "${CMD}" | sed 's/;\s*/;\n/g'
     exit 0
 fi
 

@@ -20,9 +20,10 @@ _CONFIGS = dict()
 _CONFIGS['app'] = dict(
     allowed_imports = ['celery_utils.*'])
 _CONFIGS['__help__app'] = dict(
-    allowed_imports = """
-List of strings with regex that should be match for allowed modules to
-be called from the webserver """)
+    allowed_imports = """List of regex strings
+
+    Those strings are matched to allow modules to be called from the
+    webserver""")
 
 _CONFIGS['broker'] = dict(
     name='redis',
@@ -33,47 +34,75 @@ _CONFIGS['broker'] = dict(
 _CONFIGS['__help__broker'] = dict(
     name="""name of the broker to use.
 
-    Allowed names so far: redis
-    """,
-    url = 'address of the redis broker service',
-    port = 'port of the redis broker',
-    db = 'which db to use. should be a number between 0 and 15',
-    result_expires = 'expiration time (in seconds) for stored task results')
+    Allowed names so far: redis""",
+    url = """ip address of the redis broker service""",
+    port = """port of the redis broker""",
+    db = """which db to use. should be a number between 0 and 15""",
+    result_expires = """expiration time (in seconds) for stored task results
+
+    This just ensures that dangling items disapper with time and do
+    not clobber the memory.""")
 
 _CONFIGS['worker'] = dict(
     workers = 2,
+    queues = 'celery',
     max_memory = 2097152)
 _CONFIGS['__help__worker'] = dict(
-    workers = 'maximum number of workers on node',
-    max_memory = """
-Maximum amount of resident memory (in KiB),
-that may be consumed by a child process
-before it will be replaced by a new one""")
+    workers = """maximum number of workers on node
+
+    Note workers are autoscale down to 0, when not used
+    """,
+    queues = """comma separated list of queues
+
+    leave the 'celery' queue, if you want to receive tasks that have
+    no 'queue' specification
+
+    Using queues one can make tasks to be executed on workers with
+    specific hardware""",
+    max_memory = """Maximum amount of resident memory (in KiB)
+
+    If the worker consumes more than this limit, it is being replaced
+    after child process is done. This helps to prevent memory leaks
+    caused by children""")
 
 _CONFIGS['localcache'] = dict(
     path = 'data/results_cache',
     limit = 10)
 _CONFIGS['__help__localcache'] = dict(
-    path = 'path where local data is stored',
-    limit = 'maximum size of local cache in GB')
+    path = """path where local data is stored
+
+    The path is relative to the git root.
+    """,
+    limit = """maximum size of local cache in GB
+
+    Local cache implement least-recently-used (LRU) eviction policy.
+    """)
 
 _CONFIGS['remotestorage'] = dict(
     use_remotes = ["localmount_"],
     default = 'localmount_dir')
 _CONFIGS['__help__remotestorage'] = dict(
-    use_remotes = """
-Specify which remotes storage to use
+    use_remotes = """Specify which remotes storage to use
 
-  'localmount_' indicates a local directory.
-  For that a configuration section should exists
-  that contains directory locations.""",
-    default = 'Default remote storage to use')
+    'localmount_' indicates a local directory.  For that a
+    configuration section should exists that contains directories
+    location. For instance, for 'localmount_dir1' a key 'dir1' in
+    'localmount_' should exist specifying location of the directory.
+
+    Each 'localmount_' storage directory should contain a file
+    'localio.sanity'. This file is used to verify, that some node
+    didn't lose its storage.
+
+    This configuration is read by the process, when one is looking for
+    a file in a remote storage.
+
+    Other remote storage are yet to be implemented.""",
+    default = """Default remote storage to use""")
 
 _CONFIGS['localmount_'] = dict(
     dir = '/data/dir')
 _CONFIGS['__help__localmount_'] = dict(
-    dir = """
-Path for 'localmount_dir' remote storage.""")
+    dir = """Path for 'localmount_dir' remote storage""")
 
 _CONFIGS['webserver'] = dict(
     host = '0.0.0.0',
@@ -82,34 +111,92 @@ _CONFIGS['webserver'] = dict(
     max_requests = 100,
     timeout = 20)
 _CONFIGS['__help__webserver'] = dict(
-    host = """
-IP address for a webserver to listen requests to
-""",
-    port = """
-Port for a webserver to listen requests to
-""",
-    workers = """
-Number of workers for a webserver
-""",
-    max_requests = """
-Maximum number of requests before webserver gives up
-""",
-    timeout = """
-Timeout for a webserver request
-""")
+    host = """ip address for a webserver to listen requests to""",
+    port = """port for a webserver to listen requests to""",
+    workers = """number of workers for a webserver""",
+    max_requests = """maximum number of requests before webserver gives up""",
+    timeout = """timeout for a webserver request""")
 
 _CONFIGS['logging'] = dict(
     path = 'data/logs',
     level = 'INFO')
 _CONFIGS['__help__logging'] = dict(
-    path = 'path for storing logs',
-    level = 'level of log messages')
+    path = """path for storing logs""",
+    level = """level of log messages""")
 
 _CONFIGS['flower'] = dict(
     port = 5555)
 _CONFIGS['__help__flower'] = dict(
-    port = 'port to use for the flower service')
+    port = """port to use for the flower service""")
 
+
+_CONFIGS['docker'] = dict(
+    name = 'cu',
+    registry = [],
+    mounts = ["data"],
+    ports = {'flower': ['docker0:5555','-:8124'],
+             'broker': ['docker0:6379'],
+             'webserver': ['-:8123']},
+    prunekeep = 2,
+    maxmemory = 0.7,
+    dockerfile = 'Dockerfile'
+)
+_CONFIGS['__help__docker'] = dict(
+    name = """name of the docker images""",
+    registry = """a list of docker registries
+
+    For example,
+    ["localhost:5000", "e.sovetkin"]
+    where "localhost:5000" indicates a locally run docker registry,
+    and "e.sovetkin" resolves to a dockerhub one.
+
+    The first registry is a special one, as it is used as the default
+    to pull images from. Other registries are a backup""",
+    mounts = """a list of mounts
+
+    For instance,
+    ["/mnt/dir1:/data/dir1","/mnt/dir2","data"]
+
+    where
+      - /mnt/dir1 is a local path, and
+        /data/dir1 is a path in the docker container
+      - /mnt/dir2 will be mounted at /mnt/dir2 inside docker
+
+      - absolute path "data" will be resolved relative to the git root
+        directory of the project on host, and /code directory inside
+        the container
+
+    Set "." to mount the git root directly. This is useful for
+    debugging, without docker image rebuild.""",
+    ports = """a dictionary specifying where docker
+    should redirect different services.
+
+    <service name>: [<network interface>:<port>]
+
+    '-' network interace indicates all interfaces
+
+    Be careful, as generic network interface may result in conflic
+    with specific network interfaces""",
+    prunekeep = """number of older images to keep locally""",
+    maxmemory = """percentage of memory allowed to use by docker""",
+    dockerfile = """path to the Dockerfile"""
+)
+
+
+_CONFIGS['ssh'] = dict(
+    hosts = {}
+)
+_CONFIGS['__help__ssh'] = dict(
+    hosts = """a dictionary of ssh host and instructions what to run there
+
+    For example,
+    {'host1': {'path': 'app-name',
+               'services': ['worker','webserver','flower','broker']},
+     'host2': {'path': 'dir2/app-name',
+               'services': ['worker']}}
+
+    """
+)
 
 def _format_comment(comment, comment_char = '#'):
     if not isinstance(comment, str):

@@ -1,0 +1,576 @@
+#!/bin/bash
+
+# commands called: awk, cut, jq, ip, git, cu_configs, grep
+
+cd $(git rev-parse --show-toplevel)
+
+
+function _defaults {
+    APP="celery_utils"
+    NAME="$(cu_configs docker name | jq -r .)"
+    PREFIX=""
+    REGISTRY="$(cu_configs docker registry | jq -r '.[]' | head -n1)"
+    RESTART="always"
+    COMMANDS=()
+    DOCKERFILE="$(cu_configs docker dockerfile | jq -r)"
+    SERVICE=""
+    VERSION="$(_version)"
+
+    IF_DRYRUN=""
+    IF_KILL=""
+    IF_NOCACHE=""
+    IF_ROOT=""
+}
+
+
+function print_help {
+    echo "Usage: $0 [command] [--option value] [--flag]"
+    echo
+    echo "Commands:"
+    echo
+    echo "    build          build an image"
+    echo
+    echo "    pull, push     sync images with configured registries"
+    echo
+    echo "    tag            tag current built image"
+    echo
+    echo "    prune          prune old images"
+    echo
+    echo "    run            run service"
+    echo
+    echo "    logs           print logs for a service"
+    echo
+    echo "    kill           kill a service"
+    echo
+    echo "    bash           run a bash inside a running service container"
+    echo
+    echo "Options:"
+    echo
+    echo "    -a,--app       name of the application to run"
+    echo "                   i.e. python package containing tasks"
+    echo "                   Default: \"${APP}\""
+    echo
+    echo "    -n,--name      name of the docker image to use"
+    echo "                   This can/should be set via configuration files"
+    echo "                   Default: \"${NAME}\""
+    echo
+    echo "    -p,--prefix    prefix added to running container names"
+    echo "                   Default: \"${PREFIX}\""
+    echo
+    echo "    -s,--service   name of the service"
+    echo "                   This defines port forwarding / mounts"
+    echo "                   Default: \"${SERVICE}\""
+    echo
+    echo "    --registry     docker registry to use"
+    echo "                   Default: \"${REGISTRY}\""
+    echo
+    echo "    --version      how to version the image"
+    echo "                   This can be set to \"stable\" or \"dev\""
+    echo "                   Default value is computed from the last commit"
+    echo "                   Default: \"${VERSION}\""
+    echo
+    echo "    --restart      restart docker policy"
+    echo "                   Default: \"${RESTART}\""
+    echo
+    echo "    --dockerfile   path to the Dockerfile"
+    echo "                   Default: \"${DOCKERFILE}\""
+    echo
+    echo "Flags:"
+    echo
+    echo "    -h,--help      print this page"
+    echo
+    echo "    -d,--dry       dry run: print commands to be executed"
+    echo
+    echo "    -k,--kill      kill before running a new service"
+    echo
+    echo "    --no-cache     ignore cache while building"
+    echo
+    echo "    --root         run container as root"
+    echo "                   If not set, container is run as a current user"
+    echo
+}
+
+
+function parse_args {
+    while [[ $# -gt 0 ]]
+    do
+        case $1 in
+            -h|--help)
+                print_help
+                exit
+                ;;
+            -a|--app)
+                shift
+                APP="$1"
+                ;;
+            -n|--name)
+                shift
+                NAME="$1"
+                ;;
+            -p|--prefix)
+                shift
+                PREFIX="$1"
+                ;;
+            -s|--service)
+                shift
+                SERVICE="$1"
+                ;;
+            --registry)
+                shift
+                REGISTRY="$1"
+                ;;
+            --version)
+                shift
+                VERSION="$1"
+                ;;
+            --restart)
+                shift
+                RESTART="$1"
+                ;;
+            --dockerfile)
+                shift
+                DOCKERFILE="$1"
+                ;;
+            -d|--dryrun)
+                IF_DRYRUN="yes"
+                shift
+                ;;
+            -k|--kill)
+                IF_KILL="yes"
+                shift
+                ;;
+            --no-cache)
+                IF_NOCACHE=" --no-cache"
+                shift
+                ;;
+            --root)
+                IF_ROOT="yes"
+                shift
+                ;;
+            -*|--*)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                COMMANDS+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
+
+
+function _check_dependency {
+    for prog in "$@"
+    do
+        if ! command -v "${prog}" &> /dev/null
+        then
+            echo "${prog} is missing!"
+            exit 1
+        fi
+    done
+}
+
+
+function _version {
+    printf "r%s.d%s.h%s" \
+           "$(git rev-list --count HEAD)"\
+           "$(git show -s --date=format:'%Y%m%d' --format=%cd HEAD)" \
+           "$(git rev-parse --short HEAD)"
+}
+
+
+# look up ip address of the specified network interface
+# so far only ipv4 allowed, see awk '/inet/...'
+#
+# note also the final ":", as this is used in port binding
+function _ip {
+    interface="$1"
+
+    if [ -z "${interface}" ]
+    then
+        >&2 echo "Empty argument for _ip not allowed!"
+        exit 1
+    fi
+
+    if [ "${interface}" == "-" ]
+    then
+        echo ""
+        return
+    fi
+
+    res=$(ip -f inet addr show "${interface}" | \
+              awk '/inet/ {print $2}' | cut -d/ -f1)
+    if [ -z "${res}" ]
+    then
+        >&2 echo "Cannot resolve ip address of the ${interface} interface"
+        exit 1
+    fi
+
+    echo "${res}:"
+}
+
+
+# resolve docker port forwarding for different services
+#
+# each service should contain corresponding section with 'port' entry
+# in the configuration file
+function _ports {
+    service="$1"
+
+    if ! src_port=$(cu_configs "${service}" port)
+    then
+        >&2 echo "Service has no specified ports! Ignoring..."
+        echo ""
+        return
+    fi
+
+    res=""
+    for binding in $(cu_configs docker ports "${service}" | jq -rc '.[]')
+    do
+        network="${binding%:*}"
+        dst_port="${binding##*:}"
+        if ! ipaddr=$(_ip ${network})
+        then
+            >&2 echo "Ignoring binding \"${binding}\" for ${service} service..."
+            continue
+        fi
+        res+=" -p ${ipaddr}${dst_port}:${src_port}"
+    done
+
+    echo "${res}"
+}
+
+
+function _expand_amount {
+    amount="$1"
+    src="${amount%:*}"
+    dst="${amount##*:}"
+
+    if [ "${src:0:1}" != "/" ]
+    then
+        src="$(pwd -P)/${src}"
+    fi
+
+    if [ "${dst:0:1}" != "/" ]
+    then
+        dst="/code/${dst}"
+    fi
+
+    echo "${src}:${dst}"
+}
+
+
+# resolve docker mounts
+function _mounts {
+    res=""
+    for amount in $(cu_configs docker mounts | jq -rc '.[]')
+    do
+        if [ -z "${amount}" ]
+        then
+            >&2 echo "Empty mount, ignoring..."
+            continue
+        fi
+
+        res+=" -v $(_expand_amount "${amount}")"
+    done
+
+    echo "${res}"
+}
+
+
+function _registry {
+    res="$1"
+
+    # use provided argument
+    if [ -z "${res}" ]
+    then
+        res="${REGISTRY}"
+    fi
+
+    if [ ! -z "${res}" ]
+    then
+        echo "${res}/"
+        return
+    fi
+}
+
+
+function _name {
+    if [ -z "${PREFIX}" ]
+    then
+        echo "${NAME}"
+        return
+    fi
+
+    echo "${NAME}-${PREFIX}"
+}
+
+
+function _image {
+    res="$(_registry $1)"
+
+    if [ -z "${res}" ]
+    then
+        echo "$(_name)"
+        return
+    fi
+
+    echo "${res}$(_name):${VERSION}"
+}
+
+
+function _do_for_registry {
+    what=$@
+
+    res=""
+    for registry in $(cu_configs docker registry | jq -rc '.[]')
+    do
+        res+="docker ${what}; "
+    done
+
+    echo "${res}"
+}
+
+
+function _pull {
+    echo $(_do_for_registry pull $(_image ${registry}))
+}
+
+
+function _push {
+    echo $(_do_for_registry push $(_image ${registry}))
+}
+
+
+function _tag {
+    echo $(_do_for_registry tag "$(_name)" $(_image ${registry}))
+}
+
+
+function _sync_submodule {
+    echo git submodule sync\; \
+         git submodule update --init --recursive
+}
+
+
+function _build {
+    echo $(_sync_submodule)\; \
+         docker build ${IF_NOCACHE} -t "$(_name)" "$(dirname ${DOCKERFILE})"\;
+}
+
+
+function _prune_containers {
+    name="$1"
+
+    ids=$(docker container ls --filter=name="${name}" -a -q | xargs)
+
+    if [ -z "${ids}" ]
+    then
+        return 0
+    fi
+
+    echo docker container rm ${ids}\;
+}
+
+
+function _prune_images {
+    name="$1"
+
+    if [ ! -z "${name}" ]
+    then
+        name="$(_registry "${name}")$(_name)"
+    else
+        name="$(_name)"
+    fi
+
+    ids=()
+    ids+=($(docker images  -f "dangling=true" -q))
+    ids+=($(docker images "${name}" -q | \
+                uniq | \
+                tail -n +$(( $(cu_configs docker prunekeep)+1 )) | \
+                xargs))
+
+    if [ "${#ids[@]}" == 0 ]
+    then
+        return 0
+    fi
+
+    echo docker rmi ${ids[@]}\;
+}
+
+
+function _memory {
+    echo $(grep MemTotal /proc/meminfo | \
+               awk -v ratio=$(cu_configs docker maxmemory) \
+                   '{print sprintf("%.2fg",ratio*$2/1024/1024)}')
+}
+
+
+function _kill {
+    name="$1"
+    if [ -z "${IF_KILL}" ]
+    then
+        return 0
+    fi
+
+    ids=$(docker container ls --filter=name="${name}" -q)
+
+    if [ -z "${ids}" ]
+    then
+        return 0
+    fi
+
+    echo docker kill ${ids}\;
+}
+
+
+function _user {
+    if [ ! -z "${IF_ROOT}" ]
+    then
+        return
+    fi
+
+    echo " --user $(id -u):$(id -g)"
+}
+
+
+function _run {
+    service="$1"
+    app="$2"
+
+    if [ -z "${service}" ]
+    then
+        >&2 echo "-s,--service for run should not be empty!"
+        exit 1
+    fi
+
+    if [ "${service}" == "broker" ]
+    then
+        res=$(_kill "${service}")
+        res+=$(_prune_containers "${service}")
+        res+=$(echo "docker run -d -t -i" \
+                    "--hostname $(hostname)-${service}" \
+                    "--name ${service}" \
+                    "--memory $(_memory)" \
+                    " --restart ${RESTART}" \
+                    " $(_ports "${service}")" \
+                    redis)
+        echo "${res}"
+        return
+    fi
+
+    res=$(_kill "$(_name)-${service}")
+    res+=$(_prune_containers "$(_name)-${service}")
+    res+=$(echo "docker run -d -t -i" \
+                "$(_user)" \
+                " --hostname $(hostname)-${service}" \
+                " --name $(_name)-${service}" \
+                "--memory $(_memory)" \
+                " --restart ${RESTART}" \
+                "$(_mounts)" \
+                " $(_ports "${service}")" \
+                " $(_image)" \
+                cu_services "${service}" -a "${app}")
+    echo "${res}"
+}
+
+
+function _logs_or_kill {
+    what="$1"
+    service="$2"
+
+    if [ "${service}" == "broker" ]
+    then
+        echo docker ${what} "${service}"
+        return
+    fi
+
+    echo docker ${what} "$(_name)-${service}"
+}
+
+
+function _bash {
+    service="$1"
+
+    echo docker exec -it "$(_name)-${service}" bash
+}
+
+
+_defaults
+parse_args $@
+_check_dependency docker
+
+for COMM in ${COMMANDS[@]}
+do
+    case $COMM in
+        pull)
+            _check_dependency cu_configs jq
+
+            CMD=$(_pull)
+            break
+            ;;
+        push)
+            _check_dependency cu_configs jq
+
+            CMD=$(_push)
+            break
+            ;;
+        tag)
+            _check_dependency cu_configs jq
+
+            CMD=$(_tag)
+            break
+            ;;
+        build)
+            _check_dependency git
+
+            CMD=$(_build)
+            break
+            ;;
+        prune)
+            _check_dependency cu_configs tail
+
+            CMD=$(_prune_images)
+            for registry in $(cu_configs docker registry | jq -rc '.[]')
+            do
+                CMD+=$(_prune_images "${registry}")
+            done
+
+            break
+            ;;
+        run)
+            _check_dependency cu_configs jq git ip awk cut hostname grep
+
+            if ! CMD=$(_run "${SERVICE}" "${APP}")
+            then
+                exit 1
+            fi
+            break
+            ;;
+        logs)
+            CMD=$(_logs_or_kill logs "${SERVICE}")
+            break
+            ;;
+        kill)
+            CMD=$(_logs_or_kill kill "${SERVICE}")
+            break
+            ;;
+        bash)
+            CMD=$(_bash "${SERVICE}")
+            break
+            ;;
+        *)
+            echo "Unknown command: ${COMM}"
+            exit 1
+            ;;
+    esac
+done
+
+if [ ! -z "${IF_DRYRUN}" ]
+then
+    echo "${CMD}" | sed 's/;\s*/;\n/g'
+    exit 0
+fi
+
+eval ${CMD}

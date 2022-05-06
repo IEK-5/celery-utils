@@ -21,7 +21,7 @@ from celery_utils.utils.matchargs \
 
 
 def task(cache = 'fn', get_args_locally = True,
-         debug_info = True, **kwargs):
+         debug_info = True, queue = 'celery', **kwargs):
     """Make a function to be a celery task
 
     :cache: expected output type.
@@ -47,6 +47,8 @@ def task(cache = 'fn', get_args_locally = True,
 
     :expire: simultaneous execution lock expire (in seconds) see
     ?celery_utils.utils.one_instance.one_instance
+
+    :queue: name of the queue to use
 
     """
     def wrapper(fun):
@@ -74,7 +76,7 @@ def task(cache = 'fn', get_args_locally = True,
         bs_cls = AddAttr(**kwargs)(celery.Task)
         bs_cls = matchargs(AddRetry)(**kwargs)(bs_cls)
 
-        @CELERY_APP.task(bind = True, base = bs_cls)
+        @CELERY_APP.task(bind = True, queue = queue, base = bs_cls)
         @wraps(fun)
         def wrap(self, *a, **kw):
             return fun(*a, **kw)

@@ -1,0 +1,297 @@
+#!/bin/bash
+
+
+function _defaults {
+    APP="celery_utils"
+    SERVICE=()
+
+    IF_DRYRUN=""
+    IF_NODOCKER=""
+    IF_NOCACHE=""
+    IF_PULLDOCKER=""
+    IF_PULLGIT=""
+}
+
+
+function print_help {
+    echo "Usage: $0 [command] [--option value]"
+    echo
+    echo "Commands:"
+    echo
+    echo "    configs           generate configuration file"
+    echo "                      This command will print generated files"
+    echo
+    echo "    rebuild           rebuild docker image"
+    echo "                      Don't forget the -a,--app option!"
+    echo
+    echo "    restart           local restart"
+    echo "                      Don't forget the -s,--service option!"
+    echo
+    echo "    ssh_restart       remote restart of all configures ssh hosts"
+    echo "                      Services on hosts are configured in the configuration file!"
+    echo
+    echo "Options:"
+    echo
+    echo "    -a,--app          name of the app to run"
+    echo "                      Default: \"${APP}\""
+    echo
+    echo "    -s,--service      name of the service to run"
+    echo "                      this option can be specified multiple times."
+    echo "                      Default: \"${SERVICE[@]}\""
+    echo
+    echo "Flags:"
+    echo
+    echo "    -h,--help         print this page"
+    echo
+    echo "    -d,--dryrun       dry run: print commands to be executed"
+    echo
+    echo "    --no-docker       flag to run services without docker"
+    echo "                      This flag is useless yet!"
+    echo
+    echo "    --no-cache        ignore docker cache while building"
+    echo
+    echo "    --pull-docker     pulls docker image on restart"
+    echo
+    echo "    --git-reset       fetch/reset git branch on restart"
+    echo "                      This assumes 'origin' remote to be an upstream"
+    echo
+}
+
+
+function parse_args {
+    while [[ $# -gt 0 ]]
+    do
+        case $1 in
+            -h|--help)
+                print_help
+                exit
+                ;;
+            -a|--app)
+                shift
+                APP="$1"
+                ;;
+            -s|--service)
+                shift
+                SERVICE+=("$1")
+                ;;
+            -d|--dryrun)
+                IF_DRYRUN="yes"
+                shift
+                ;;
+            --no-docker)
+                IF_NODOCKER="yes"
+                shift
+                ;;
+            --no-cache)
+                IF_NOCACHE=" --no-cache"
+                shift
+                ;;
+            --pull-docker)
+                IF_PULLDOCKER="yes"
+                shift
+                ;;
+            --git-reset)
+                IF_PULLGIT="yes"
+                shift
+                ;;
+            -*|--*)
+                echo "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                COMMANDS+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
+
+
+function _configs {
+    echo python3 - \<\<\<\ "'from celery_utils.configs.configs import write_config_wrt_git; write_config_wrt_git()'"\; \
+         python3 - \<\<\<\ "'from celery_utils.configs.docker import write_dockerfile; write_dockerfile()'"
+}
+
+
+function _rebuild {
+    args="-a $1 ${IF_NOCACHE}"
+
+    if [ ! -z "${IF_DRYRUN}" ]
+    then
+        args+=" -d"
+        echo $(cu_docker build ${args}) \
+             $(cu_docker tag ${args}) \
+             $(cu_docker push ${args})
+        return
+    fi
+
+    echo cu_docker build ${args}\; \
+         cu_docker tag ${args}\; \
+         cu_docker push ${args}
+}
+
+
+function _sync_submodule {
+    echo git submodule sync\; \
+         git submodule update --init --recursive
+}
+
+
+function _pullgit {
+    echo git stash\; git fetch\; \
+         git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)\; \
+         git stash pop\; $(_sync_submodule)\;
+}
+
+
+function _pulldocker {
+    app="$1"
+
+    if [ ! -z "${IF_DRYRUN}" ]
+    then
+        echo $(cu_docker pull -a "${app}" -d)\;
+        return
+    fi
+
+    echo cu_docker pull -a "${app}"\;
+}
+
+
+function _restart {
+    service="$1"
+    app="$2"
+
+    if [ ! -z "${IF_NODOCKER}" ] && [ "${service}" == "broker" ]
+    then
+        _check_dependency redis-server cu_configs jq
+        echo redis-server --port $(cu_configs broker port | jq -r .)
+        return
+    fi
+
+    if [ ! -z "${IF_NODOCKER}" ]
+    then
+        >&2 echo "Not implemented yet..."
+        exit 1
+
+        _check_dependency cu_services
+        # TODO: do via supervisord?
+        echo cu_servises "${service}" -a "${app}"
+        return
+    fi
+
+    res=""
+    if [ ! -z "${IF_PULLGIT}" ]
+    then
+        res=$(_pullgit)
+    fi
+
+    if [ ! -z "${IF_PULLDOCKER}" ]
+    then
+        res+=$(_pulldocker "${app}")
+    fi
+
+    if [ ! -z "${IF_DRYRUN}" ]
+    then
+        res+=$(cu_docker run -k -s "${service}" -a "${app}" -d)\;
+        echo "${res}"
+        return
+    fi
+
+    res+=$(echo cu_docker run -k -s "${service}" -a "${app}"\;)
+    echo "${res}"
+}
+
+
+function _ssh_restart {
+    app="$1"
+    res=""
+    for host in $(cu_configs ssh hosts | jq -rc 'keys[]')
+    do
+        path=$(cu_configs ssh hosts "${host}" path | jq -r .)
+        args=$(./cu_configs ssh hosts "${host}" services \
+                   | jq -rc ' .[]' \
+                   | xargs -I{} echo -s {} | xargs)
+
+        args+=" --app ${app}"
+        [ ! -z "${IF_PULLDOCKER}" ] && args+=" --pull-docker"
+        [ ! -z "${IF_PULLGIT}" ] && args+=" --git-reset"
+        [ ! -z "${IF_NODOCKER}" ] && args+=" --no-docker"
+
+        res+="ssh $host /bin/bash \"cd ${path}; cu restart ${args}\"\; "
+    done
+
+    echo "${res}"
+}
+
+
+function _check_dependency {
+    for prog in "$@"
+    do
+        if ! command -v "${prog}" &> /dev/null
+        then
+            echo "${prog} is missing!"
+            exit 1
+        fi
+    done
+}
+
+
+_defaults
+parse_args $@
+
+
+for COMM in ${COMMANDS[@]}
+do
+    case $COMM in
+        configs)
+            _check_dependency python3 cu
+
+            CMD=$(_configs)
+            break
+            ;;
+        rebuild)
+            _check_dependency cu_docker
+
+            CMD=$(_rebuild "${APP}")
+            break
+            ;;
+        restart)
+            if [ -z "${IF_NODOCKER}" ]
+            then
+                _check_dependency docker cu_docker
+            fi
+
+            if [ "${#SERVICE[@]}" == 0 ]
+            then
+                >&2 echo "At least one of the -s,--service must be set!"
+                exit 1
+            fi
+
+            for s in "${SERVICE[@]}"
+            do
+                CMD+=$(_restart "${s}" "${APP}")
+            done
+
+            break
+            ;;
+        ssh_restart)
+            _check_dependency ssh cu_configs jq xargs
+
+            CMD=$(_ssh_restart "${APP}")
+            break
+            ;;
+        *)
+            echo "Unknown command: ${COMM}"
+            exit 1
+            ;;
+    esac
+done
+
+
+if [ ! -z "${IF_DRYRUN}" ]
+then
+    echo "${CMD}" | sed 's/;\s*/;\n/g'
+    exit 0
+fi
+
+eval ${CMD}
