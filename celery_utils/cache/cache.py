@@ -1,8 +1,9 @@
 import os
 import json
 import celery
-import logging
 import pickle
+import logging
+import inspect
 
 from functools import wraps
 
@@ -21,6 +22,22 @@ from celery_utils.cache.compute_ofn \
     import compute_ofn
 from celery_utils.cache.ifpass_minage \
     import ifpass_minage
+
+
+def _function_defaults(fun, **kwargs):
+    res = {}
+
+    for k, v in inspect.signature(fun).parameters.items():
+        if k in kwargs:
+            res[k] = kwargs[k]
+            continue
+
+        if v.default is inspect._empty:
+            continue
+
+        res[k] = v.default
+
+    return res
 
 
 def _logging(msg, how = logging.debug, **kwargs):
@@ -128,6 +145,13 @@ def cache_fn_results(link = False,
 
             ofn_rpath.upload()
             return str(ofn_rpath)
+
+        wrap._cache_args = \
+            {'link': link,
+             'storage_type': storage_type,
+             'check_storage_kwargs': \
+             _function_defaults\
+             (_check_in_storage, **check_storage_kwargs)}
         return wrap
     return wrapper
 
@@ -219,6 +243,12 @@ def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
                            'storage_type': storage_type})
             _save_calls(calls = calls, ofn = call_fn.path)
             return calls
+
+        wrap._cache_args = \
+            {'storage_type': storage_type,
+             'check_storage_kwargs': \
+             _function_defaults\
+             (_check_in_storage, **check_storage_kwargs)}
         return wrap
     return wrapper
 
