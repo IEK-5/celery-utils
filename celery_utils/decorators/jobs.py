@@ -6,6 +6,8 @@ from celery_utils.app \
     import CELERY_APP
 from celery_utils.storage.get_locally \
     import get_locally
+from celery_utils.decorators.addattr \
+    import AddAttr
 from celery_utils.decorators.addretry \
     import AddRetry
 from celery_utils.decorators.one_instance \
@@ -64,9 +66,16 @@ def task_decorator(expire = 600,
             fun = cache_decorator\
                 (output = cache, **cache_args)(fun)
 
-        @CELERY_APP.task\
-            (bind = True,
-             base = AddRetry(**retry_args)(celery.Task))
+        bs_cls = AddAttr\
+            (expire = expire,
+             cache = cache,
+             cache_args = fun._cache_args if \
+             hasattr(fun, '_cache_args') else cache_args,
+             get_args_locally = get_args_locally)\
+             (celery.Task)
+        bs_cls = AddRetry(**retry_args)(bs_cls)
+
+        @CELERY_APP.task(bind = True, base = bs_cls)
         @wraps(fun)
         def wrap(self, *args, **kwargs):
             return fun(*args, **kwargs)
@@ -119,9 +128,14 @@ def call_decorator(cache = True,
         def wrap(*args, **kwargs):
             return fun(*args, **kwargs)
 
-        if add_calldocs:
-            wrap._calldocs = calldocs(wrap, calldocs_kwargs,
-                                      calldocs_others)
+        wrap.cu_attr = \
+            {'cache': cache,
+             'cache_args': fun._cache_args if \
+             hasattr(fun, '_cache_args') else cache_args,
+             'get_args_locally': get_args_locally,
+             'calldocs': calldocs\
+             (wrap, calldocs_kwargs, calldocs_others) \
+             if add_calldocs else None}
 
         return wrap
     return wrapper
