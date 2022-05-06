@@ -31,7 +31,7 @@ function _start_worker {
 
 function _start_flower {
     echo celery -A "$1" \
-         --broker=$(cu_configs redis_url | jq -r .) \
+         --broker=$(cu_configs broker_url | jq -r .) \
          flower \
          --port="$(cu_configs flower port | jq -r .)"
 }

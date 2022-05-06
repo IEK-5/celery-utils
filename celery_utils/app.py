@@ -43,16 +43,17 @@ CONFIGS['webserver_logs_kwargs'] = {
     'level': CONFIGS['logging']['level'],
     'format': "[%(asctime)s] %(levelname)s: %(filename)s::%(funcName)s %(message)s"}
 
-CONFIGS['redis_url'] = 'redis://{url}:{port}/{db}'.format\
-    (url = CONFIGS['redis']['url'],
-     port = CONFIGS['redis']['port'],
-     db = CONFIGS['redis']['db'])
+CONFIGS['broker_url'] = '{name}://{url}:{port}/{db}'.format\
+    (name = CONFIGS['broker']['name'],
+     url = CONFIGS['broker']['url'],
+     port = CONFIGS['broker']['port'],
+     db = CONFIGS['broker']['db'])
 
 CELERY_APP = celery.Celery\
-    (broker=CONFIGS['redis_url'],
-     backend=CONFIGS['redis_url'],
+    (broker=CONFIGS['broker_url'],
+     backend=CONFIGS['broker_url'],
      task_track_started=True,
-     result_expires = CONFIGS['redis']['result_expires'],
+     result_expires = CONFIGS['broker']['result_expires'],
      enable_utc = True)
 CELERY_APP.autodiscover_tasks(['celery_utils.cache','celery_utils.webserver'])
 
@@ -67,8 +68,8 @@ CACHE_ODIR = CONFIGS['localcache']['path']
 def get_Tasks_Queues():
     return Redis_Dictionary\
         (name = 'celery_utils_tasks_queue',
-         redis_url = CONFIGS['redis_url'],
-         expire_time = CONFIGS['redis']['result_expires'])
+         redis_url = CONFIGS['broker_url'],
+         expire_time = CONFIGS['broker']['result_expires'])
 
 
 def get_RESULTS_CACHE():
@@ -83,4 +84,4 @@ def get_LOCAL_STORAGE(remotetype):
             ("remotetype = {} does not match localmount_*")
 
     return LOCALIO_Files(root = _LOCAL_STORAGE_ROOTS[remotetype],
-                         redis_url = CONFIGS['redis_url'])
+                         redis_url = CONFIGS['broker_url'])

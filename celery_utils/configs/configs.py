@@ -24,12 +24,17 @@ _CONFIGS['__help__app'] = dict(
 List of strings with regex that should be match for allowed modules to
 be called from the webserver """)
 
-_CONFIGS['redis'] = dict(
+_CONFIGS['broker'] = dict(
+    name='redis',
     url = 'localhost',
     port = 6379,
     db = 0,
     result_expires = 7200)
-_CONFIGS['__help__redis'] = dict(
+_CONFIGS['__help__broker'] = dict(
+    name="""name of the broker to use.
+
+    Allowed names so far: redis
+    """,
     url = 'address of the redis broker service',
     port = 'port of the redis broker',
     db = 'which db to use. should be a number between 0 and 15',

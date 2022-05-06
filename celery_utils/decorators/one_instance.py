@@ -25,7 +25,7 @@ def one_instance(expire=60):
                   fun.__name__, args, kwargs))
             try:
                 with RedisLock\
-                     (redis_url = CONFIGS['redis_url'],
+                     (redis_url = CONFIGS['broker_url'],
                       key = key,
                       timeout = expire):
                     return fun(*args, **kwargs)
