@@ -6,15 +6,15 @@ from celery_utils.app \
     import CELERY_APP
 from celery_utils.storage.get_locally \
     import get_locally
-from celery_utils.decorators.addattr \
+from celery_utils.utils.addattr \
     import AddAttr
-from celery_utils.decorators.addretry \
+from celery_utils.utils.addretry \
     import AddRetry
-from celery_utils.decorators.one_instance \
+from celery_utils.utils.one_instance \
     import one_instance
-from celery_utils.decorators.calldocs \
+from celery_utils.utils.calldocs \
     import calldocs
-from celery_utils.decorators.debug_function_info \
+from celery_utils.utils.debug_function_info \
     import debug_decorator
 
 

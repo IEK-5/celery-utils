@@ -10,7 +10,7 @@ from celery.result \
 from celery_utils.storage.remotestorage_path \
     import searchandget_locally, is_remote_path
 
-from celery_utils.decorators.one_instance \
+from celery_utils.exceptions \
     import TASK_RUNNING
 
 from celery_utils.app \

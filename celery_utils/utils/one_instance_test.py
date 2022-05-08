@@ -5,7 +5,7 @@ from celery_utils.utils.tasks \
 
 
 def test_queueonce():
-    from celery_utils.decorators.one_instance import TASK_RUNNING
+    from celery_utils.exceptions import TASK_RUNNING
 
     a = task_test_queueonce.delay(sleep = 2, dummy = 1)
     b = task_test_queueonce.delay(sleep = 1, dummy = 1)

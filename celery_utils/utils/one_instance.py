@@ -11,9 +11,8 @@ from celery_utils.utils.float_hash \
 from celery_utils.utils.redis.lock \
     import RedisLock, Locked
 
-
-class TASK_RUNNING(Exception):
-    pass
+from celery_utils.exceptions \
+    import TASK_RUNNING
 
 
 def one_instance(expire=60):

@@ -41,27 +41,27 @@ def searchandget_locally(fn):
          .format(path=fn))
 
 
-def searchif_instorage(fn):
-    for remotetype in ALLOWED_REMOTE:
-        rpath = RemoteStoragePath\
-            (fn, remotetype = remotetype)
-        if rpath.in_storage(True):
-            return True
+# def searchif_instorage(fn):
+#     for remotetype in ALLOWED_REMOTE:
+#         rpath = RemoteStoragePath\
+#             (fn, remotetype = remotetype)
+#         if rpath.in_storage(True):
+#             return True
 
-    return False
+#     return False
 
 
-def search_determineremote(fn, ignore_remote):
-    for remotetype in ALLOWED_REMOTE:
-        if remotetype == ignore_remote:
-            continue
+# def search_determineremote(fn, ignore_remote):
+#     for remotetype in ALLOWED_REMOTE:
+#         if remotetype == ignore_remote:
+#             continue
 
-        rpath = RemoteStoragePath\
-            (fn, remotetype = remotetype)
-        if rpath.in_storage():
-            return rpath
+#         rpath = RemoteStoragePath\
+#             (fn, remotetype = remotetype)
+#         if rpath.in_storage():
+#             return rpath
 
-    return None
+#     return None
 
 
 class RemoteStoragePath:

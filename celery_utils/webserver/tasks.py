@@ -1,4 +1,4 @@
-from celery_utils.decorators.jobs \
+from celery_utils.decorators \
     import task_decorator
 
 from celery_utils.utils.import_function \

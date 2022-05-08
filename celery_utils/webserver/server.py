@@ -7,7 +7,7 @@ from celery_utils.app \
 
 logging.basicConfig(**CONFIGS['webserver_logs_kwargs'])
 
-from celery_utils.decorators.calldocs \
+from celery_utils.utils.calldocs \
     import calldocs
 
 from celery_utils.utils.import_function \
