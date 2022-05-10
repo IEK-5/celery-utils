@@ -3,9 +3,12 @@ import re
 import logging
 import filelock
 
-# TODO: configs: path resolve, allowed_remote
 from celery_utils.app \
     import ALLOWED_REMOTE, CACHE_ODIR
+
+from celery_utils.exceptions \
+    import NOT_IN_STORAGE
+
 
 REGEX = re.compile(r'^(.*)://(.*)')
 
@@ -36,32 +39,9 @@ def searchandget_locally(fn):
         if rpath.in_storage():
             return rpath.get_locally()
 
-    raise RuntimeError\
+    raise NOT_IN_STORAGE\
         ("{path} not any remote storage!"\
          .format(path=fn))
-
-
-# def searchif_instorage(fn):
-#     for remotetype in ALLOWED_REMOTE:
-#         rpath = RemoteStoragePath\
-#             (fn, remotetype = remotetype)
-#         if rpath.in_storage(True):
-#             return True
-
-#     return False
-
-
-# def search_determineremote(fn, ignore_remote):
-#     for remotetype in ALLOWED_REMOTE:
-#         if remotetype == ignore_remote:
-#             continue
-
-#         rpath = RemoteStoragePath\
-#             (fn, remotetype = remotetype)
-#         if rpath.in_storage():
-#             return rpath
-
-#     return None
 
 
 class RemoteStoragePath:
@@ -118,7 +98,6 @@ class RemoteStoragePath:
 
     @property
     def _localcache(self):
-        # TODO: import get_RESULTS_CACHE
         from celery_utils.app import get_RESULTS_CACHE
         return get_RESULTS_CACHE()
 
@@ -157,22 +136,17 @@ class RemoteStoragePath:
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
 
         with filelock.FileLock(self._lock_fn):
-            logging.debug("get_locally: got the lock")
             if self.path in self._localcache:
                 return self.path
 
-            logging.debug("get_locally: check local")
             if self.path not in self._storage:
-                raise RuntimeError\
+                raise NOT_IN_STORAGE\
                     ("{path} not a {remotetype}!"\
                      .format(path=self.path,
                              remotetype=self.remotetype))
 
-            logging.debug("get_locally: check remote")
             try:
-                logging.debug("get_locally: start downloading")
                 self._storage.download(self.path, self.path)
-                logging.debug("get_locally: finish downloading")
             except Exception as e:
                 logging.error("""Failed to download file: {}
                 error: {}
@@ -180,7 +154,6 @@ class RemoteStoragePath:
                 """.format(self.path,str(e),self.remotetype))
                 raise e
 
-            logging.debug("get_locally: add to localcache")
             self._localcache.add(self.path)
             self._localcache.add(self._lock_fn)
             return self.path
@@ -200,6 +173,11 @@ class RemoteStoragePath:
 
 
     def link(self, src, timestamp = None):
+        if src not in self._storage:
+            raise NOT_IN_STORAGE\
+                ("{src} not a {remotetype}!"\
+                 .format(src=src, remotetype=self.remotetype))
+
         try:
             self._storage.link(src, self.path, timestamp)
         except Exception as e:

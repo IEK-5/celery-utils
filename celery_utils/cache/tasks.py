@@ -10,10 +10,12 @@ from celery_utils.storage.remotestorage_path \
 from celery_utils.utils.files \
     import move_file
 
+from celery_utils.exceptions \
+    import NOT_IN_STORAGE
 
-# TODO call_fn_cache: retry on any exceptions?
-#       - retry on storage errors?
-@task(cache = None, get_args_locally = False)
+
+@task(cache = None, get_args_locally = False,
+      autoretry_for = [NOT_IN_STORAGE])
 def call_fn_cache(result, ofn, storage_type):
     if result is None:
         return ofn

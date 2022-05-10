@@ -3,4 +3,6 @@
 class TASK_RUNNING(Exception):
     pass
 
-# TODO generic storage exceptions?
+
+class NOT_IN_STORAGE(Exception):
+    pass
