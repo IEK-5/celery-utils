@@ -15,6 +15,8 @@ from celery_utils.storage.remotestorage_path \
 
 from celery_utils.utils.files \
     import remove_file, move_file, get_tempfile
+from celery_utils.utils.matchargs \
+    import matchargs
 
 from celery_utils.cache.tasks \
     import call_fn_cache
@@ -104,7 +106,7 @@ def _check_in_storage(fun, args, kwargs,
 def cache_fn_results(link = False,
                      ignore = lambda x: False,
                      storage_type = DEFAULT_REMOTE,
-                     check_storage_kwargs = {}):
+                     **cache_kwargs):
     """Cache results of a function that returns a file
 
     :link: if using a hardlink instead of moving file to local cache
@@ -121,10 +123,11 @@ def cache_fn_results(link = False,
     def wrapper(fun):
         @wraps(fun)
         def wrap(*args, **kwargs):
-            isin, ofn, ofn_rpath, _ = _check_in_storage\
+            isin, ofn, ofn_rpath, _ = \
+                matchargs(_check_in_storage)\
                 (fun = fun, args = args, kwargs = kwargs,
                  storage_type = storage_type,
-                 **check_storage_kwargs)
+                 **cache_kwargs)
 
             if isin:
                 return str(ofn_rpath)
@@ -148,15 +151,15 @@ def cache_fn_results(link = False,
 
         wrap._cache_args = \
             {'link': link,
-             'storage_type': storage_type,
-             'check_storage_kwargs': \
-             _function_defaults\
-             (_check_in_storage, **check_storage_kwargs)}
+             'storage_type': storage_type}
+        wrap._cache_args.update\
+            (_function_defaults\
+             (_check_in_storage, **cache_kwargs))
         return wrap
     return wrapper
 
 
-@cache_fn_results(check_storage_kwargs = {'ofn_arg': 'ofn'})
+@cache_fn_results(ofn_arg='ofn')
 def _save_calls(calls, ofn):
     try:
         with open(ofn, 'w') as f:
@@ -202,7 +205,7 @@ def _pickle2results(fun):
 
 
 def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
-                          check_storage_kwargs = {}):
+                          **cache_kwargs):
     """Wraps tasks generation calls (*/calls.py)
 
     This adds an additional task to the queue, that sets the result of
@@ -217,10 +220,11 @@ def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
     def wrapper(fun):
         @wraps(fun)
         def wrap(*args, **kwargs):
-            isin, ofn, ofn_rpath, minage = _check_in_storage\
+            isin, ofn, ofn_rpath, minage = \
+                matchargs(_check_in_storage)\
                 (fun = fun, args = args, kwargs = kwargs,
                  storage_type = storage_type,
-                 **check_storage_kwargs)
+                 **cache_kwargs)
 
             if isin:
                 return call_fn_cache.signature\
@@ -245,10 +249,10 @@ def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
             return calls
 
         wrap._cache_args = \
-            {'storage_type': storage_type,
-             'check_storage_kwargs': \
-             _function_defaults\
-             (_check_in_storage, **check_storage_kwargs)}
+            {'storage_type': storage_type}
+        wrap._cache_args.update\
+            (_function_defaults\
+             (_check_in_storage, **check_storage_kwargs))
         return wrap
     return wrapper
 
@@ -283,11 +287,11 @@ def cache(output = 'fn', **kwargs):
     """
     def wrapper(fun):
         if 'fn' == output:
-            return cache_fn_results(**kwargs)(fun)
+            return matchargs(cache_fn_results)(**kwargs)(fun)
         elif 'call' == output:
-            return call_cache_fn_results(**kwargs)(fun)
+            return matchargs(call_cache_fn_results)(**kwargs)(fun)
         elif 'pickle' == output:
-            return cache_pickle_results(**kwargs)(fun)
+            return matchargs(cache_pickle_results)(**kwargs)(fun)
         else:
             raise RuntimeError\
                 ("cache: invalid argument output = {}"\

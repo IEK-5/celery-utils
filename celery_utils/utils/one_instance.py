@@ -16,6 +16,11 @@ from celery_utils.exceptions \
 
 
 def one_instance(expire=60):
+    """Introduce and iter-machine lock for a function
+
+    :expire: number of seconds after which the lock expires
+
+    """
     def wrapper(fun):
         @wraps(fun)
         def wrap(*args, **kwargs):

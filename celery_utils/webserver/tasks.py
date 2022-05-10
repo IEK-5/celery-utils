@@ -1,12 +1,11 @@
 from celery_utils.decorators \
-    import task_decorator
+    import task
 
 from celery_utils.utils.import_function \
     import import_function
 
 
-@task_decorator(cache = None,
-                debug_info = True)
+@task(cache = None, debug_info = True)
 def generate_task_queue(call_string, args):
     """Generate processing queue and start the task
 

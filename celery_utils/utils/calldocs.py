@@ -88,11 +88,11 @@ def _deduce_calldocs(fun, options):
     return _compute_calldocs(fun, options)
 
 
-def calldocs(fun, options = {}, tail = []):
+def calldocs(fun, calldocs_options = {}, calldocs_tail = []):
     res = {}
 
-    for f in tail[::-1]:
+    for f in calldocs_tail[::-1]:
         res.update(_deduce_calldocs(f,{}))
 
-    res.update(_deduce_calldocs(fun, options))
+    res.update(_deduce_calldocs(fun, calldocs_options))
     return res

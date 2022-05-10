@@ -2,7 +2,7 @@ import os
 import time
 
 from celery_utils.decorators \
-    import task_decorator
+    import task
 
 from celery_utils.storage.remotestorage_path \
     import RemoteStoragePath, is_remote_path
@@ -13,8 +13,7 @@ from celery_utils.utils.files \
 
 # TODO call_fn_cache: retry on any exceptions?
 #       - retry on storage errors?
-@task_decorator(cache = None,
-                get_args_locally = False)
+@task(cache = None, get_args_locally = False)
 def call_fn_cache(result, ofn, storage_type):
     if result is None:
         return ofn

@@ -33,7 +33,7 @@ def _logging_level(level):
              .format(level))
 
 
-def debug_decorator(level = 'debug', **info):
+def debug_decorator(debug_loglevel = 'debug', **info):
     """Print function calls and extra info
 
     :level: level of messages: 'debug', 'info', 'warning',
@@ -45,7 +45,7 @@ def debug_decorator(level = 'debug', **info):
     def wrapper(fun):
         @wraps(fun)
         def wrap(*args, **kwargs):
-            loghow = _logging_level(level)
+            loghow = _logging_level(debug_loglevel)
             loghow("""function call: {}
             args: {}
             kwargs: {}
