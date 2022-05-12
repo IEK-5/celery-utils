@@ -84,7 +84,8 @@ def task(cache = 'fn', get_args_locally = True,
 
 
 def call(cache = True, get_args_locally = False,
-         debug_info = True, add_calldocs = True, **kwargs):
+         debug_info = True, add_calldocs = True,
+         autoretry_for = [], **kwargs):
     """A decorator that produces chain of celery tasks
 
     :cache: if cache call results
@@ -96,6 +97,9 @@ def call(cache = True, get_args_locally = False,
     ?celery_utils.decorators.debug_function_info.debug_decorator
 
     :add_calldocs: if add docs attribute
+
+    :autoretry_for: this specifies exceptions occurring during the
+    call execution, that should trigger the autoretry
 
     :docs, docs_kwargs, docs_others:
     sets ._call_docs attribute, allowing webserver to pass arguments,
@@ -122,7 +126,8 @@ def call(cache = True, get_args_locally = False,
 
         attr = {'cache': cache,
                 'get_args_locally': get_args_locally,
-                'debug_info': debug_info}
+                'debug_info': debug_info,
+                'autoretry_for': autoretry_for}
         attr.update(**kwargs)
         if hasattr(fun, '_cache_args'):
             attr.update(fun._cache_args)
