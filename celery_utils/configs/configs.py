@@ -18,12 +18,15 @@ _help_re = re.compile(r'__help__.*')
 _CONFIGS = dict()
 
 _CONFIGS['app'] = dict(
-    allowed_imports = ['celery_utils.*'])
+    allowed_imports = ['celery_utils.*'],
+    autodiscover = ['celery_utils'])
 _CONFIGS['__help__app'] = dict(
     allowed_imports = """List of regex strings
 
     Those strings are matched to allow modules to be called from the
-    webserver""")
+    webserver""",
+    autodiscover = """List of packages that workers autodiscover"""
+)
 
 _CONFIGS['broker'] = dict(
     name='redis',

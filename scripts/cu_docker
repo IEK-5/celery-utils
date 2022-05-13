@@ -48,6 +48,8 @@ function print_help {
     echo
     echo "    -a,--app       name of the application to run"
     echo "                   i.e. python package containing tasks"
+    echo "                   Default value is probably okay for all use cases,"
+    echo "                   as the tasks are imported through configuration files."
     echo "                   Default: \"${APP}\""
     echo
     echo "    -n,--name      name of the docker image to use"

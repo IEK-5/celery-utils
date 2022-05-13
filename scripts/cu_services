@@ -64,6 +64,8 @@ function print_help {
     echo "Options:"
     echo
     echo "    -a,--app     name of the app to run"
+    echo "                 Default value is probably okay for all use cases,"
+    echo "                 as the tasks are imported through configuration files."
     echo "                 Default: \"${APP}\""
     echo
     echo "Flags:"

@@ -22,7 +22,6 @@ function print_help {
     echo "                      This command will print generated files"
     echo
     echo "    rebuild           rebuild docker image"
-    echo "                      Don't forget the -a,--app option!"
     echo
     echo "    restart           local restart"
     echo "                      Don't forget the -s,--service option!"
@@ -33,6 +32,10 @@ function print_help {
     echo "Options:"
     echo
     echo "    -a,--app          name of the app to run"
+    echo "                      If use non-default value, make sure to have "
+    echo "                      something like this in the __init__.py"
+    echo "                          from celery_utils import CELERY_APP, CONFIGS"
+    echo "                          CELERY_APP.autodiscover_tasks(CONFIGS['app']['autodiscover'])"
     echo "                      Default: \"${APP}\""
     echo
     echo "    -s,--service      name of the service to run"
