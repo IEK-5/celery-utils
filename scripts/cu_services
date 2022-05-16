@@ -18,6 +18,9 @@
 #
 
 
+cd $(git rev-parse --show-toplevel)
+
+
 function _defaults {
     APP="cu"
 
@@ -65,6 +68,19 @@ function _start_webserver {
 }
 
 
+function _logrotate {
+    path="$(cu_configs logging logrotate | jq -r .)"
+
+    if [ ! -f "${path}" ]
+    then
+        >&2 echo "${path} file is missing! Run cu configs to generate it"
+        exit 1
+    fi
+
+    echo logrotate -v "${path}" -s "${path}.state"
+}
+
+
 function print_help {
     echo "Usage: $0 [command] [--option value]"
     echo
@@ -75,6 +91,8 @@ function print_help {
     echo "    webserver    start a webserver"
     echo
     echo "    flower       start a flower service"
+    echo
+    echo "    logrotate    run logrotate"
     echo
     echo "Options:"
     echo
@@ -142,6 +160,11 @@ do
         flower)
             _check_dependency celery cu_configs jq
             CMD=$(_start_flower "${APP}")
+            break
+            ;;
+        logrotate)
+            _check_dependency logrotate
+            CMD=$(_logrotate)
             break
             ;;
         *)

@@ -36,6 +36,7 @@ function _defaults {
     IF_KILL=""
     IF_NOCACHE=""
     IF_ROOT=""
+    IF_LOGROTATE=""
 }
 
 
@@ -106,6 +107,8 @@ function print_help {
     echo "    --root         run container as root"
     echo "                   If not set, container is run as a current user"
     echo
+    echo "    --logrotate    rotate logs before running a service"
+    echo
 }
 
 
@@ -163,6 +166,10 @@ function parse_args {
                 ;;
             --root)
                 IF_ROOT="yes"
+                shift
+                ;;
+            --logrotate)
+                IF_LOGROTATE="yes"
                 shift
                 ;;
             -*|--*)
@@ -479,6 +486,12 @@ function _run {
     fi
 
     res=$(_kill "$(_name)-${service}")
+
+    if [ ! -z "${IF_LOGROTATE}" ]
+    then
+        res+=$(echo cu_services logrotate\;)
+    fi
+
     res+=$(_prune_containers "$(_name)-${service}")
     res+=$(echo "docker run -d -t -i" \
                 "$(_user)" \

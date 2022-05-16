@@ -128,8 +128,7 @@ function parse_args {
 
 
 function _configs {
-    echo python3 - \<\<\<\ "'from cu.configs.configs import write_config_wrt_git; write_config_wrt_git()'"\; \
-         python3 - \<\<\<\ "'from cu.configs.docker import write_dockerfile; write_dockerfile()'"
+    echo python3 - \<\<\<\ "'from cu.configs.configs import write_config_cu, write_config_templates; write_config_cu(); write_config_templates()'"
 }
 
 
@@ -212,12 +211,12 @@ function _restart {
 
     if [ ! -z "${IF_DRYRUN}" ]
     then
-        res+=$(cu_docker run -k -s "${service}" -a "${app}" -d)\;
+        res+=$(cu_docker run -k -s "${service}" -a "${app}" --logrotate -d)\;
         echo "${res}"
         return
     fi
 
-    res+=$(echo cu_docker run -k -s "${service}" -a "${app}"\;)
+    res+=$(echo cu_docker run -k -s "${service}" --logrotate -a "${app}"\;)
     echo "${res}"
 }
 

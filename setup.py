@@ -57,7 +57,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url='git@github.com:esovetkin/celery-utils',
     packages=setuptools.find_packages(),
-    package_data={'configs': ['Dockerfile']},
+    package_data={'configs': ['Dockerfile', 'logrotate.conf']},
     include_package_data=True,
     scripts=find_executable('scripts/'),
     install_requires=requirements)

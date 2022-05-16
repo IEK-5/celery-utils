@@ -19,6 +19,7 @@
 import os
 import re
 import json
+import pkgutil
 
 from configparser \
     import ConfigParser
@@ -140,10 +141,14 @@ _CONFIGS['__help__webserver'] = dict(
 
 _CONFIGS['logging'] = dict(
     path = 'data/logs',
-    level = 'INFO')
+    level = 'INFO',
+    logrotate = 'data/configs/logrotate.conf')
 _CONFIGS['__help__logging'] = dict(
     path = """path for storing logs""",
-    level = """level of log messages""")
+    level = """level of log messages""",
+    logrotate = """logrotate.conf file path
+
+    logrotate is called from the git root directory""")
 
 _CONFIGS['flower'] = dict(
     port = 5555)
@@ -325,7 +330,7 @@ def _configpath_wrt_path(path):
                         'configs','cu.conf')
 
 
-def write_config_wrt_git(dotnew = True):
+def write_config_cu(dotnew = True):
     path = _configpath_wrt_path(git_root())
 
     if os.path.exists(path):
@@ -343,3 +348,30 @@ def write_config_wrt_git(dotnew = True):
 def read_config_wrt_git():
     root = git_root()
     return root, read_configs(_configpath_wrt_path(root))
+
+
+def _write_pkgdata(ofn, package, resource):
+    data = pkgutil.get_data(package, resource)
+
+    os.makedirs(os.path.dirname(ofn), exist_ok = True)
+    if os.path.exists(ofn):
+        ofn += ".confnew"
+
+    with open(ofn, 'wb') as f:
+        f.write(data)
+    return ofn
+
+
+def write_config_templates():
+    from cu import CONFIGS
+
+    data = [{'ofn': os.path.join\
+             (git_root(), CONFIGS['docker']['dockerfile']),
+             'package': 'cu.configs',
+             'resource': 'Dockerfile'},
+            {'ofn': os.path.join\
+             (git_root(), CONFIGS['logging']['logrotate']),
+             'package': 'cu.configs',
+             'resource': 'logrotate.conf'}]
+    for args in data:
+        print(_write_pkgdata(**args))
