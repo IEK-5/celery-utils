@@ -48,7 +48,7 @@ def find_executable(path):
 
 
 setuptools.setup(
-    name='celery-utils',
+    name='cu',
     version='0.1',
     author='Evgenii Sovetkin',
     author_email='e.sovetkin@fz-juelich.de',

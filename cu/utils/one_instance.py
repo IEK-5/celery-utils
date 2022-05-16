@@ -21,15 +21,15 @@ import logging
 from functools \
     import wraps
 
-from celery_utils.app import CONFIGS
+from cu.app import CONFIGS
 
-from celery_utils.utils.float_hash \
+from cu.utils.float_hash \
     import float_hash
 
-from celery_utils.utils.redis.lock \
+from cu.utils.redis.lock \
     import RedisLock, Locked
 
-from celery_utils.exceptions \
+from cu.exceptions \
     import TASK_RUNNING
 
 

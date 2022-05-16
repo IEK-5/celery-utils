@@ -22,7 +22,7 @@ cd $(git rev-parse --show-toplevel)
 
 
 function _defaults {
-    APP="celery_utils"
+    APP="cu"
     NAME="$(cu_configs docker name | jq -r .)"
     PREFIX=""
     REGISTRY="$(cu_configs docker registry | jq -r '.[]' | head -n1)"

@@ -26,7 +26,7 @@ from configparser \
 from json.decoder \
     import JSONDecodeError
 
-from celery_utils.utils.git \
+from cu.utils.git \
     import git_root
 
 
@@ -36,8 +36,8 @@ _help_re = re.compile(r'__help__.*')
 _CONFIGS = dict()
 
 _CONFIGS['app'] = dict(
-    allowed_imports = ['celery_utils.*'],
-    autodiscover = ['celery_utils'])
+    allowed_imports = ['cu.*'],
+    autodiscover = ['cu'])
 _CONFIGS['__help__app'] = dict(
     allowed_imports = """List of regex strings
 
@@ -322,7 +322,7 @@ def read_configs(ifn):
 
 def _configpath_wrt_path(path):
     return os.path.join(path,'data',
-                        'configs','celery_utils.conf')
+                        'configs','cu.conf')
 
 
 def write_config_wrt_git(dotnew = True):

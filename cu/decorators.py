@@ -20,21 +20,21 @@ import celery
 
 from functools import wraps
 
-from celery_utils.app \
+from cu.app \
     import CELERY_APP
-from celery_utils.storage.get_locally \
+from cu.storage.get_locally \
     import get_locally
-from celery_utils.utils.addattr \
+from cu.utils.addattr \
     import AddAttr
-from celery_utils.utils.addretry \
+from cu.utils.addretry \
     import AddRetry
-from celery_utils.utils.one_instance \
+from cu.utils.one_instance \
     import one_instance
-from celery_utils.utils.calldocs \
+from cu.utils.calldocs \
     import calldocs
-from celery_utils.utils.debug_function_info \
+from cu.utils.debug_function_info \
     import debug_decorator
-from celery_utils.utils.matchargs \
+from cu.utils.matchargs \
     import matchargs
 
 
@@ -52,19 +52,19 @@ def task(cache = 'fn', get_args_locally = True,
     arguments
 
     :link, ignore, storage_type:
-    see ?celery_utils.cache.cache_fn_results
+    see ?cu.cache.cache_fn_results
 
     :keys, storage_type, ofn_arg, path_prefix, path_prefix_arg, minage, update_timestamp:
-    see ?celery_utils.cache.cache._check_in_storage
+    see ?cu.cache.cache._check_in_storage
 
     :debug_info, debug_loglevel, debug_info_kwargs:
-    see ?celery_utils.decorators.debug_function_info.debug_decorator
+    see ?cu.decorators.debug_function_info.debug_decorator
 
     :autoretry_for, max_retries, retry_backoff, retry_backoff_max, retry_jitter:
-    see ?celery_utils.addretry.AddRetry
+    see ?cu.addretry.AddRetry
 
     :expire: simultaneous execution lock expire (in seconds) see
-    ?celery_utils.utils.one_instance.one_instance
+    ?cu.utils.one_instance.one_instance
 
     :queue: name of the queue to use
 
@@ -79,7 +79,7 @@ def task(cache = 'fn', get_args_locally = True,
         fun = matchargs(one_instance)(**kwargs)(fun)
 
         if cache is not None:
-            from celery_utils.cache.cache \
+            from cu.cache.cache \
                 import cache as cache_decorator
             fun = matchargs(cache_decorator)\
                 (output = cache, **kwargs)(fun)
@@ -114,7 +114,7 @@ def call(cache = True, get_args_locally = False,
     arguments
 
     :debug_info, debug_loglevel, debug_info_kwargs: see
-    ?celery_utils.decorators.debug_function_info.debug_decorator
+    ?cu.decorators.debug_function_info.debug_decorator
 
     :add_calldocs: if add docs attribute
 
@@ -124,7 +124,7 @@ def call(cache = True, get_args_locally = False,
     :docs, docs_kwargs, docs_others:
     sets ._call_docs attribute, allowing webserver to pass arguments,
     determine default values and generate help page
-    ? celery_utils.decorators.call_docs.call_docs
+    ? cu.decorators.call_docs.call_docs
 
     """
     def wrapper(fun):
@@ -135,7 +135,7 @@ def call(cache = True, get_args_locally = False,
             fun = get_locally(fun)
 
         if cache:
-            from celery_utils.cache.cache \
+            from cu.cache.cache \
                 import cache as cache_decorator
             fun = matchargs(cache)\
                 (output = 'call', **kwargs)(fun)

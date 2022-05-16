@@ -19,7 +19,7 @@
 import time
 import redis
 
-from celery_utils.utils.redis.parse_url \
+from cu.utils.redis.parse_url \
     import parse_url
 
 

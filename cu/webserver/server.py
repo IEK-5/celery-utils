@@ -20,21 +20,21 @@ import re
 import bottle
 import logging
 
-from celery_utils.app \
+from cu.app \
     import CONFIGS
 
 logging.basicConfig(**CONFIGS['webserver_logs_kwargs'])
 
-from celery_utils.utils.calldocs \
+from cu.utils.calldocs \
     import calldocs
 
-from celery_utils.utils.import_function \
+from cu.utils.import_function \
     import import_function
 
-from celery_utils.webserver.utils \
+from cu.webserver.utils \
     import format_help
 
-from celery_utils.webserver.utils \
+from cu.webserver.utils \
     import format_help, return_exception, \
     call_method, parse_args, serve
 

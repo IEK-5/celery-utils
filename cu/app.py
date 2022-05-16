@@ -22,15 +22,15 @@ import json
 import celery
 import logging
 
-from celery_utils.configs.configs \
+from cu.configs.configs \
     import read_config_wrt_git
 
-from celery_utils.utils.redis.dictionary \
+from cu.utils.redis.dictionary \
     import Redis_Dictionary
 
-from celery_utils.storage.files_lrucache \
+from cu.storage.files_lrucache \
     import Files_LRUCache
-from celery_utils.storage.local_io.files \
+from cu.storage.local_io.files \
     import LOCALIO_Files
 
 
@@ -73,7 +73,7 @@ CELERY_APP = celery.Celery\
      task_track_started=True,
      result_expires = CONFIGS['broker']['result_expires'],
      enable_utc = True)
-CELERY_APP.autodiscover_tasks(['celery_utils.cache','celery_utils.webserver'])
+CELERY_APP.autodiscover_tasks(['cu.cache','cu.webserver'])
 
 ALLOWED_REMOTE = CONFIGS['remotestorage']['use_remotes']
 ALLOWED_REMOTE, _LOCAL_STORAGE_ROOTS = \

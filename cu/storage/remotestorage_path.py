@@ -21,10 +21,10 @@ import re
 import logging
 import filelock
 
-from celery_utils.app \
+from cu.app \
     import ALLOWED_REMOTE, CACHE_ODIR
 
-from celery_utils.exceptions \
+from cu.exceptions \
     import NOT_IN_STORAGE
 
 
@@ -106,7 +106,7 @@ class RemoteStoragePath:
     @property
     def _storage(self):
         if re.match(r'localmount_.*',self.remotetype):
-            from celery_utils.app \
+            from cu.app \
                 import get_LOCAL_STORAGE
             return get_LOCAL_STORAGE(self.remotetype)
         else:
@@ -116,7 +116,7 @@ class RemoteStoragePath:
 
     @property
     def _localcache(self):
-        from celery_utils.app import get_RESULTS_CACHE
+        from cu.app import get_RESULTS_CACHE
         return get_RESULTS_CACHE()
 
 

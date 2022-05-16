@@ -19,10 +19,10 @@
 import json
 import redis
 
-from celery_utils.utils.float_hash \
+from cu.utils.float_hash \
     import float_hash
 
-from celery_utils.utils.redis.parse_url \
+from cu.utils.redis.parse_url \
     import parse_url
 
 

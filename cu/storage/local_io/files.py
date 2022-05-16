@@ -21,7 +21,7 @@ import time
 import shutil
 import logging
 
-from celery_utils.utils.redis.lock \
+from cu.utils.redis.lock \
     import RedisLock
 
 

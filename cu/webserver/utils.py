@@ -25,16 +25,16 @@ import traceback
 from celery.result \
     import AsyncResult
 
-from celery_utils.storage.remotestorage_path \
+from cu.storage.remotestorage_path \
     import searchandget_locally, is_remote_path
 
-from celery_utils.exceptions \
+from cu.exceptions \
     import TASK_RUNNING
 
-from celery_utils.app \
+from cu.app \
     import get_Tasks_Queues, CONFIGS
 
-from celery_utils.webserver.tasks \
+from cu.webserver.tasks \
     import generate_task_queue
 
 

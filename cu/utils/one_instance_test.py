@@ -18,12 +18,12 @@
 
 import time
 
-from celery_utils.utils.tasks \
+from cu.utils.tasks \
     import task_test_queueonce
 
 
 def test_queueonce():
-    from celery_utils.exceptions import TASK_RUNNING
+    from cu.exceptions import TASK_RUNNING
 
     a = task_test_queueonce.delay(sleep = 2, dummy = 1)
     b = task_test_queueonce.delay(sleep = 1, dummy = 1)

@@ -19,7 +19,7 @@
 
 
 function _defaults {
-    APP="celery_utils"
+    APP="cu"
 
     IF_DRYRUN=""
 }
@@ -61,7 +61,7 @@ function _start_flower {
 
 
 function _start_webserver {
-    echo python3 - \<\<\< "'import celery_utils.webserver.server'"
+    echo python3 - \<\<\< "'import cu.webserver.server'"
 }
 
 

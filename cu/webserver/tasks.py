@@ -18,13 +18,13 @@
 
 import logging
 
-from celery_utils.decorators \
+from cu.decorators \
     import task
 
-from celery_utils.utils.import_function \
+from cu.utils.import_function \
     import import_function
 
-from celery_utils.exceptions \
+from cu.exceptions \
     import RETRY_GENERATE_TASK_QUEUE
 
 

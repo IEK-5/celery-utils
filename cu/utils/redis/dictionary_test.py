@@ -18,10 +18,10 @@
 
 import time
 
-from celery_utils.utils.redis_dictionary \
+from cu.utils.redis_dictionary \
     import Redis_Dictionary
 
-from celery_utils \
+from cu \
     import REDIS_IP
 
 

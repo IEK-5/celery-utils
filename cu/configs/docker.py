@@ -19,15 +19,15 @@
 import os
 import pkgutil
 
-from celery_utils.app \
+from cu.app \
     import CONFIGS
 
-from celery_utils.utils.git \
+from cu.utils.git \
     import git_root
 
 
 def _write_template(ofn):
-    data = pkgutil.get_data('celery_utils.configs',
+    data = pkgutil.get_data('cu.configs',
                             'Dockerfile')
     with open(ofn, 'wb') as f:
         f.write(data)

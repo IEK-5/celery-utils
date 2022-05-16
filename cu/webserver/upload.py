@@ -19,10 +19,10 @@
 import os
 import hashlib
 
-from celery_utils.app \
+from cu.app \
     import CACHE_ODIR
 
-from celery_utils.cache.cache \
+from cu.cache.cache \
     import cache
 
 from cu.utils.files \

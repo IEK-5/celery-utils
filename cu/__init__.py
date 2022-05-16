@@ -15,16 +15,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from celery_utils.app import CELERY_APP
-from celery_utils.app import CONFIGS
+from cu.app import CELERY_APP
+from cu.app import CONFIGS
 
-from celery_utils.cache.cache import cache
+from cu.cache.cache import cache
 
-from celery_utils.decorators import call
-from celery_utils.decorators import task
+from cu.decorators import call
+from cu.decorators import task
 
-from celery_utils.exceptions import TASK_RUNNING, NOT_IN_STORAGE
+from cu.exceptions import TASK_RUNNING, NOT_IN_STORAGE
 
-from celery_utils.webserver.upload import upload, download
+from cu.webserver.upload import upload, download
 
 CELERY_APP.autodiscover_tasks(CONFIGS['app']['autodiscover'])

@@ -19,7 +19,7 @@
 
 
 function _defaults {
-    APP="celery_utils"
+    APP="cu"
     SERVICE=()
 
     IF_DRYRUN=""
@@ -51,7 +51,7 @@ function print_help {
     echo "    -a,--app          name of the app to run"
     echo "                      If use non-default value, make sure to have "
     echo "                      something like this in the __init__.py"
-    echo "                          from celery_utils import CELERY_APP, CONFIGS"
+    echo "                          from cu import CELERY_APP, CONFIGS"
     echo "                          CELERY_APP.autodiscover_tasks(CONFIGS['app']['autodiscover'])"
     echo "                      Default: \"${APP}\""
     echo
@@ -128,8 +128,8 @@ function parse_args {
 
 
 function _configs {
-    echo python3 - \<\<\<\ "'from celery_utils.configs.configs import write_config_wrt_git; write_config_wrt_git()'"\; \
-         python3 - \<\<\<\ "'from celery_utils.configs.docker import write_dockerfile; write_dockerfile()'"
+    echo python3 - \<\<\<\ "'from cu.configs.configs import write_config_wrt_git; write_config_wrt_git()'"\; \
+         python3 - \<\<\<\ "'from cu.configs.docker import write_dockerfile; write_dockerfile()'"
 }
 
 

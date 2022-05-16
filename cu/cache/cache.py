@@ -25,22 +25,22 @@ import inspect
 
 from functools import wraps
 
-from celery_utils.app \
+from cu.app \
     import DEFAULT_REMOTE
 
-from celery_utils.storage.remotestorage_path \
+from cu.storage.remotestorage_path \
     import RemoteStoragePath, is_remote_path
 
-from celery_utils.utils.files \
+from cu.utils.files \
     import remove_file, move_file, get_tempfile
-from celery_utils.utils.matchargs \
+from cu.utils.matchargs \
     import matchargs
 
-from celery_utils.cache.tasks \
+from cu.cache.tasks \
     import call_fn_cache
-from celery_utils.cache.compute_ofn \
+from cu.cache.compute_ofn \
     import compute_ofn
-from celery_utils.cache.ifpass_minage \
+from cu.cache.ifpass_minage \
     import ifpass_minage
 
 
@@ -135,7 +135,7 @@ def cache_fn_results(link = False,
     :storage_type: type of remote storage.
 
     :check_storage_kwargs: see optional arguments of
-    ?celery_utils.cache.cache._check_in_storage
+    ?cu.cache.cache._check_in_storage
 
     """
     def wrapper(fun):
@@ -232,7 +232,7 @@ def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
     :storage_type: type of remote storage.
 
     :check_storage_kwargs: see optional arguments of
-    ?celery_utils.cache.cache._check_in_storage
+    ?cu.cache.cache._check_in_storage
 
     """
     def wrapper(fun):
@@ -278,7 +278,7 @@ def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
 def cache_pickle_results(**kwargs):
     """Cache results of a function that returns a pickable object
 
-    :kwargs: see ?celery_utils.cache.cache.cache_fn_results
+    :kwargs: see ?cu.cache.cache.cache_fn_results
 
     """
     def wrapper(fun):
@@ -298,9 +298,9 @@ def cache(output = 'fn', **kwargs):
         - 'pickle' expects a pickable objects
 
     :kwargs: depending on the output, see
-       - 'fn': ?celery_utils.cache.cache.cache_fn_results
-       - 'call': ?celery_utils.cache.cache.call_cache_fn_results
-       - 'pickle': ?celery_utils.cache.cache.cache_pickle_results
+       - 'fn': ?cu.cache.cache.cache_fn_results
+       - 'call': ?cu.cache.cache.call_cache_fn_results
+       - 'pickle': ?cu.cache.cache.cache_pickle_results
 
     """
     def wrapper(fun):

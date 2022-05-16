@@ -20,7 +20,7 @@
 import sys
 import json
 
-from celery_utils.app import CONFIGS
+from cu.app import CONFIGS
 
 
 def get_config(configs, args):

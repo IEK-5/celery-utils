@@ -22,7 +22,7 @@ import logging
 import tempfile
 
 
-from celery_utils.utils.git \
+from cu.utils.git \
     import git_root
 
 

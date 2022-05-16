@@ -20,10 +20,10 @@ import os
 import celery
 import inspect
 
-from celery_utils.app \
+from cu.app \
     import CACHE_ODIR
 
-from celery_utils.utils.float_hash \
+from cu.utils.float_hash \
     import float_hash
 
 

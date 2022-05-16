@@ -18,7 +18,7 @@
 
 import pytest
 
-from celery_utils.utils.matchargs \
+from cu.utils.matchargs \
     import matchargs
 
 

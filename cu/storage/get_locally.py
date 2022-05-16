@@ -18,7 +18,7 @@
 
 from functools import wraps
 
-from celery_utils.storage.remotestorage_path \
+from cu.storage.remotestorage_path \
     import RemoteStoragePath, is_remote_path
 
 

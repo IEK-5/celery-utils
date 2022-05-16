@@ -19,16 +19,16 @@
 import os
 import time
 
-from celery_utils.decorators \
+from cu.decorators \
     import task
 
-from celery_utils.storage.remotestorage_path \
+from cu.storage.remotestorage_path \
     import RemoteStoragePath, is_remote_path
 
-from celery_utils.utils.files \
+from cu.utils.files \
     import move_file
 
-from celery_utils.exceptions \
+from cu.exceptions \
     import NOT_IN_STORAGE
 
 
