@@ -92,6 +92,9 @@ def do_method(method_str):
     # serve_type = args['serve_type']
     # del args['serve_type']
 
+    # TODO: special treatment should be for /upload
+    # bottle.request.files.data to pass to upload() correctly?
+
     return serve(call_method(method=method_str, args=args),
                  serve_type = 'file')
 
