@@ -29,26 +29,54 @@ from cu.utils.files \
     import move_file
 
 from cu.exceptions \
-    import NOT_IN_STORAGE
+    import FILE_DISAPPEARED
 
 
-@task(cache = None, get_args_locally = False,
-      autoretry_for = [NOT_IN_STORAGE])
-def call_fn_cache(result, ofn, storage_type):
+def _ofn(meta_fn, ofn):
+    if not meta_fn.in_storage():
+        raise FILE_DISAPPEARED('{}_meta has disappeared!')
+
+    serialise = meta_fn.get_locally(True)['serialise']
+    return str(RemoteStoragePath(ofn, serialise = serialise))
+
+
+def _save_meta(data, ofn):
+    return data
+
+
+def _cache_meta(data, meta_fn, cache_kwargs):
+    from cu.cache.cache import cache_fn
+    cache_fn(return_type=meta_fn.serialisation,
+             ofn_arg='ofn', **cache_kwargs)(_save_meta)\
+             (data = data, ofn = meta_fn.path)
+
+
+@task(cache = False, get_args_locally = False)
+def call_fn_cache(result, ofn, call_serialiser, cache_kwargs):
+    ofn = RemoteStoragePath(ofn).path
+    meta_fn = RemoteStoragePath\
+        (ofn + '_meta', serialise = call_serialiser)
+
     if result is None:
-        return ofn
+        return _ofn(meta_fn, ofn)
 
+    result_rmt = RemoteStoragePath(result)
     ofn = RemoteStoragePath\
-        (ofn, remotetype = storage_type)
-    result_rmt = RemoteStoragePath\
-        (result, remotetype = storage_type)
-
-    if os.path.exists(result_rmt.path):
-        move_file(result_rmt.path, ofn.path, True)
+        (ofn, serialise=result_rmt.serialisation)
 
     if is_remote_path(result):
+        _cache_meta(data = {'serialise': ofn.serialisation},
+                    meta_fn = meta_fn, cache_kwargs = cache_kwargs)
         ofn.link(result_rmt.path)
         return str(ofn)
 
+    if not os.path.exists(result_rmt.path):
+        raise FILE_DISAPPEARED\
+            (f"{result_rmt.path} is not remote "
+             "and not locally present!")
+
+    # result_rmt is not a remote path, but a local one. It is assumed
+    # here, that no serialisation is needed!
+    move_file(result_rmt.path, ofn.path, True)
     ofn.upload()
     return str(ofn)

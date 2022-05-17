@@ -26,3 +26,11 @@ class NOT_IN_STORAGE(Exception):
 
 class RETRY_GENERATE_TASK_QUEUE(Exception):
     pass
+
+
+class FILE_DISAPPEARED(Exception):
+    pass
+
+
+class UNSUPPORTED_REMOTE:
+    pass

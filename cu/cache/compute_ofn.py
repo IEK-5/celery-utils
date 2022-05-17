@@ -34,8 +34,9 @@ def _full_fn_name(fun):
     return os.path.join(*res.__name__.split('.'), fun.__name__)
 
 
-def compute_ofn(fun, args, kwargs, keys, ofn_arg,
-                prefix = None, prefix_arg = None):
+def compute_ofn(fun, args, kwargs,
+                keys = None, ofn_arg = None,
+                path_prefix = None, path_prefix_arg = None):
     """Compute ofn given function and arguments
 
     :fun, args, kwargs: function and arguments
@@ -46,9 +47,9 @@ def compute_ofn(fun, args, kwargs, keys, ofn_arg,
     :ofn_arg: key in kwargs. instead of computing filename use the
               provided in kwargs.
 
-    :prefix: subdirectory to place the file
+    :path_prefix: subdirectory to place the file
 
-    :prefix_arg: key of kwargs. specify prefix via kwargs
+    :path_prefix_arg: key of kwargs. specify prefix via kwargs
 
     :return: filename
 
@@ -74,12 +75,13 @@ def compute_ofn(fun, args, kwargs, keys, ofn_arg,
     fullfn = _full_fn_name(fun)
     key = float_hash(("cache_results", fullfn, uniq))
 
-    prefix = '' if prefix is None else prefix
-    if prefix_arg is not None and \
-       prefix_arg in kwargs:
-        prefix = os.path.join(prefix,kwargs[prefix_arg])
+    path_prefix = '' if path_prefix is None else path_prefix
+    if path_prefix_arg is not None and \
+       path_prefix_arg in kwargs:
+        path_prefix = os.path.join\
+            (path_prefix,kwargs[path_prefix_arg])
 
-    ofn = os.path.join(CACHE_ODIR, prefix, fullfn)
+    ofn = os.path.join(CACHE_ODIR, path_prefix, fullfn)
     os.makedirs(ofn, exist_ok = True)
 
     return os.path.join(ofn, key)

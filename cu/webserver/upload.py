@@ -23,7 +23,7 @@ from cu.app \
     import CACHE_ODIR
 
 from cu.cache.cache \
-    import cache
+    import cache_fn
 
 from cu.utils.files \
     import remove_file, get_tempfile
@@ -39,7 +39,7 @@ def _hash_file(fn, chunk_size = 4096):
     return h.hexdigest()
 
 
-@cache(keys = ['name'], link = True, ofn_arg = 'name')
+@cache_fn(keys = ['name'], link = True, ofn_arg = 'name')
 def _upload_file(fn, name):
     return fn
 

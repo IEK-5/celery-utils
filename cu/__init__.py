@@ -18,7 +18,7 @@
 from cu.app import CELERY_APP
 from cu.app import CONFIGS
 
-from cu.cache.cache import cache
+from cu.cache.cache import cache_fn
 
 from cu.decorators import call
 from cu.decorators import task

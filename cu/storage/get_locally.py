@@ -31,7 +31,7 @@ def _get_locally_item(x):
         x = [_get_locally_item(v) for v in x]
 
     if isinstance(x, str) and is_remote_path(x):
-        x = RemoteStoragePath(x).get_locally()
+        x = RemoteStoragePath(x).get_locally(True)
 
     return x
 

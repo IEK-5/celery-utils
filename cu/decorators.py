@@ -38,35 +38,33 @@ from cu.utils.matchargs \
     import matchargs
 
 
-def task(cache = 'fn', get_args_locally = True,
-         debug_info = True, queue = 'celery', **kwargs):
+def task(cache = True, queue = 'celery',
+         get_args_locally = True, debug_info = False,
+         **kwargs):
     """Make a function to be a celery task
 
-    :cache: expected output type.
-        - None do not cache anything
-        - 'fn' expect local path with a file
-        - 'pickle' except pickable python object
-          that is stored in a cache as a pickle file
+    :cache: if True, results are cached
+
+    :queue: name of the queue to use
 
     :get_args_locally: if resolve obtain locally all remote paths in
     arguments
 
-    :link, ignore, storage_type:
-    see ?cu.cache.cache_fn_results
+    :debug_info: if True log extra debug info
 
-    :keys, storage_type, ofn_arg, path_prefix, path_prefix_arg, minage, update_timestamp:
-    see ?cu.cache.cache._check_in_storage
+    :return_type, remove_return, ignore, storage_type: see
+    ?cu.cache.cache.cache_fn
 
-    :debug_info, debug_loglevel, debug_info_kwargs:
-    see ?cu.decorators.debug_function_info.debug_decorator
+    :keys, storage_type, ofn_arg, path_prefix, path_prefix_arg,
+    minage, update_timestamp: see ?cu.cache.cache._check_in_storage
 
-    :autoretry_for, max_retries, retry_backoff, retry_backoff_max, retry_jitter:
-    see ?cu.addretry.AddRetry
+    :debug_loglevel, debug_info_kwargs: see
+    ?cu.utils.debug_function_info.debug_decorator
 
-    :expire: simultaneous execution lock expire (in seconds) see
-    ?cu.utils.one_instance.one_instance
+    :autoretry_for, max_retries, retry_backoff, retry_backoff_max,
+    retry_jitter: see ?cu.addretry.AddRetry
 
-    :queue: name of the queue to use
+    :expire: see ?cu.utils.one_instance.one_instance
 
     """
     def wrapper(fun):
@@ -78,11 +76,9 @@ def task(cache = 'fn', get_args_locally = True,
 
         fun = matchargs(one_instance)(**kwargs)(fun)
 
-        if cache is not None:
-            from cu.cache.cache \
-                import cache as cache_decorator
-            fun = matchargs(cache_decorator)\
-                (output = cache, **kwargs)(fun)
+        if cache:
+            from cu.cache.cache import cache_fn
+            fun = matchargs(cache_fn)(**kwargs)(fun)
 
         attr = {'cache': cache,
                 'get_args_locally': get_args_locally,
@@ -108,23 +104,31 @@ def call(cache = True, get_args_locally = False,
          autoretry_for = [], **kwargs):
     """A decorator that produces chain of celery tasks
 
-    :cache: if cache call results
+    :cache: if True, results are cached
 
     :get_args_locally: if resolve obtain locally all remote paths in
     arguments
 
-    :debug_info, debug_loglevel, debug_info_kwargs: see
-    ?cu.decorators.debug_function_info.debug_decorator
+    :debug_info: if True log extra debug info
+
+    :cache: if cache call results
 
     :add_calldocs: if add docs attribute
 
     :autoretry_for: this specifies exceptions occurring during the
     call execution, that should trigger the autoretry
 
-    :docs, docs_kwargs, docs_others:
-    sets ._call_docs attribute, allowing webserver to pass arguments,
-    determine default values and generate help page
-    ? cu.decorators.call_docs.call_docs
+    :call_serialiser, storage_type: see ?cu.cache.cache.cache_call
+
+    :keys, storage_type, ofn_arg, path_prefix, path_prefix_arg,
+    minage, update_timestamp: see ?cu.cache.cache._check_in_storage
+
+    :debug_loglevel, debug_info_kwargs: see
+    ?cu.utils.debug_function_info.debug_decorator
+
+    :docs, docs_kwargs, docs_others: sets ._call_docs attribute,
+    allowing webserver to pass arguments, determine default values and
+    generate help page ? cu.utils.calldocs.calldocs
 
     """
     def wrapper(fun):
@@ -135,10 +139,8 @@ def call(cache = True, get_args_locally = False,
             fun = get_locally(fun)
 
         if cache:
-            from cu.cache.cache \
-                import cache as cache_decorator
-            fun = matchargs(cache)\
-                (output = 'call', **kwargs)(fun)
+            from cu.cache.cache import cache_call
+            fun = matchargs(cache_call)(**kwargs)(fun)
 
         @wraps(fun)
         def wrap(*a, **kw):

@@ -17,16 +17,14 @@
 
 
 import os
-import json
 import celery
-import pickle
-import logging
 import inspect
+import logging
 
 from functools import wraps
 
-from cu.app \
-    import DEFAULT_REMOTE
+from cu.exceptions \
+    import FILE_DISAPPEARED
 
 from cu.storage.remotestorage_path \
     import RemoteStoragePath, is_remote_path
@@ -35,6 +33,8 @@ from cu.utils.files \
     import remove_file, move_file, get_tempfile
 from cu.utils.matchargs \
     import matchargs
+from cu.utils.serialise \
+    import serialise, deserialise
 
 from cu.cache.tasks \
     import call_fn_cache
@@ -60,92 +60,68 @@ def _function_defaults(fun, **kwargs):
     return res
 
 
-def _logging(msg, how = logging.debug, **kwargs):
-    for k,v in kwargs.items():
-        msg += """
-        {} = {}
-        """.format(k,v)
-    how(msg)
-
-
 def _check_in_storage(fun, args, kwargs,
-                      storage_type,
-                      keys = None,
-                      ofn_arg = None,
-                      path_prefix = None,
-                      path_prefix_arg = None,
-                      minage = None,
-                      update_timestamp = True):
-    """Check call in storage
+                      minage = None, update_timestamp = True,
+                      **ofn_kwargs):
+    """Check function call present in the storage
 
     :fun, args, kwargs: function and arguments
 
-    :storage_type: type of remote storage.
-
-    :keys: list of arguments name to use for computing the unique name
-    for the cache item
-
-    :ofn_arg: optional name of the kwargs that is intented to be used
-    as a output filename
-
-    :path_prefix, path_prefix_arg: how to prefix path of the file
-
-    :minage: unixtime, minage of acceptable stored cached value. if
-    None any cached value is accepted
+    :minage: see ?cu.cache.ifpass_minage.ifpass_minage
 
     :update_timestamp: if update timestamp on cache hit
 
+    :keys, ofn_arg, path_prefix, path_prefix_arg: see ?cu.cache.compute_ofn.compute_ofn
+
+    :remotetype, serialise: see ?cu.storage.remotestorage_path.RemoteStoragePath
+
     """
-    ofn = compute_ofn(fun = fun, args = args,
-                      kwargs = kwargs, keys = keys,
-                      ofn_arg = ofn_arg,
-                      prefix = path_prefix,
-                      prefix_arg = path_prefix_arg)
-    ofn_rpath = RemoteStoragePath\
-        (ofn, remotetype=storage_type)
+    ofn = matchargs(compute_ofn)\
+        (fun = fun, args = args, kwargs = kwargs, **ofn_kwargs)
+    ofn_rpath = matchargs(RemoteStoragePath)\
+        (path = ofn, **ofn_kwargs)
 
     if ofn_rpath.in_storage() and \
-       ifpass_minage(minage,
-                     ofn_rpath.get_timestamp(),
-                     kwargs):
-        _logging("File is in cache!",
-                 ofn = ofn, fun = fun.__name__,
-                 args = args, kwargs = kwargs)
+       ifpass_minage(minage = minage,
+                     fntime = ofn_rpath.get_timestamp(),
+                     kwargs = kwargs):
         if update_timestamp:
             ofn_rpath.update_timestamp()
-        return True, ofn, ofn_rpath, minage
+        return True, ofn_rpath
 
-    _logging("File is NOT in cache!",
-             ofn = ofn, fun = fun.__name__,
-             args = args, kwargs = kwargs)
-    return False, ofn, ofn_rpath, minage
+    return False, ofn_rpath
 
 
-def cache_fn_results(link = False,
-                     ignore = lambda x: False,
-                     storage_type = DEFAULT_REMOTE,
-                     **cache_kwargs):
+def cache_fn(return_type = 'path', remove_return = True,
+             ignore = lambda x: False, **cache_kwargs):
     """Cache results of a function that returns a file
 
-    :link: if using a hardlink instead of moving file to local cache
+    :return_type: what to expect from the function
+          - 'path' expects a path
+          - 'pickle' expects a pickle-serialisable object
+          - 'json' expects a json-serialisable object
+          - 'msgpack' expects a msgpack-serialisable object
+
+    :remove_return: if True, then return filename from the function is
+    considered to be temporary and removed. if 'path' != return_type,
+    then True value is implied.
 
     :ignore: a boolean function that is computed if result of a
     function should be ignored.
 
-    :storage_type: type of remote storage.
-
-    :check_storage_kwargs: see optional arguments of
-    ?cu.cache.cache._check_in_storage
+    :cache_kwargs: see ?cu.cache.cache._check_in_storage
 
     """
     def wrapper(fun):
+        if 'path' != return_type:
+            fun = serialise(how = return_type)(fun)
+
         @wraps(fun)
         def wrap(*args, **kwargs):
-            isin, ofn, ofn_rpath, _ = \
+            isin, ofn_rpath = \
                 matchargs(_check_in_storage)\
                 (fun = fun, args = args, kwargs = kwargs,
-                 storage_type = storage_type,
-                 **cache_kwargs)
+                 serialise = return_type, **cache_kwargs)
 
             if isin:
                 return str(ofn_rpath)
@@ -155,163 +131,119 @@ def cache_fn_results(link = False,
             if ignore(tfn):
                 return tfn
 
-            tfn_rpath = RemoteStoragePath(tfn, remotetype=storage_type)
-
-            if os.path.exists(tfn_rpath.path):
-                move_file(tfn_rpath.path, ofn, link)
+            tfn_rpath = RemoteStoragePath(tfn)
 
             if is_remote_path(tfn):
                 ofn_rpath.link(tfn_rpath.path)
                 return str(ofn_rpath)
 
+            if not os.path.exists(tfn_rpath.path):
+                raise FILE_DISAPPEARED\
+                    (f"{tfn_rpath.path} is not remote "
+                     "and not locally present!")
+
+            # linking file does not remove it!
+            if_link = not (('path' != return_type) or remove_return)
+            move_file(tfn_rpath.path, ofn_rpath.path, if_link)
             ofn_rpath.upload()
             return str(ofn_rpath)
 
         wrap._cache_args = \
-            {'link': link,
-             'storage_type': storage_type}
+            {'return_type': return_type,
+             'remove_return': remove_return}
+        wrap._cache_args.update\
+            (_function_defaults\
+             (_check_in_storage, **cache_kwargs))
+        wrap._cache_args.update\
+            (_function_defaults\
+             (RemoteStoragePath, serialise = return_type,
+              **cache_kwargs))
+        return wrap
+    return wrapper
+
+
+class _CALL_NOT_IN_CACHE(Exception):
+    pass
+
+
+def _save_call(calls, ofn):
+    if calls is not None:
+        return calls
+
+    # explanation: _save_call is wraped with cache_fn, hence if ofn
+    # exists in a remote storage it will be get locally and, the
+    # following line should not be reached. If calls is not None, then
+    # _save_call has been called to actually save the call.
+    raise _CALL_NOT_IN_CACHE(f"ofn = {ofn}")
+
+
+def cache_call(call_serialiser = 'msgpack', cache_result = True, **cache_kwargs):
+    """Wraps tasks generation calls (*/calls.py)
+
+    :call_serialiser: how to serialise the celery call
+
+    :cache_result: if True an additional task to the queue, that sets
+    the result of the call to the cache
+
+    :cache_kwargs: see ?cu.cache.cache._check_in_storage
+
+    """
+    def wrapper(fun):
+        sc = cache_fn\
+            (return_type=call_serialiser, ofn_arg='ofn',
+             **cache_kwargs)(_save_call)
+
+        @wraps(fun)
+        def wrap(*args, **kwargs):
+            isin, ofn_rpath = \
+                matchargs(_check_in_storage)\
+                (fun = fun, args = args, kwargs = kwargs,
+                 **cache_kwargs)
+
+            # '*_meta' contains some meta information about the call:
+            # how to serialise the result.
+            meta_fn = matchargs(RemoteStoragePath)\
+                (path = ofn_rpath.path + '_meta',
+                 serialise = call_serialiser, **cache_kwargs)
+            if cache_result and isin and meta_fn.in_storage():
+                # at this point meta_fn must exist!
+                return call_fn_cache.signature\
+                    (kwargs = {'result': None,
+                               'call_serialiser': call_serialiser,
+                               'cache_kwargs': cache_kwargs,
+                               'ofn': str(ofn_rpath)})
+
+            # '*_call' file contains the serialised task tree (below
+            # 'calls'). 'calls' can be pretty big, and hence
+            # serialised on one worker and not send over broker
+            call_fn = matchargs(RemoteStoragePath)\
+                (path = ofn_rpath.path + '_call',
+                 serialise = call_serialiser, **cache_kwargs)
+            try:
+                return celery.signature\
+                    (RemoteStoragePath\
+                     (sc(calls = None, ofn = call_fn.path))\
+                     .get_locally(True))
+            except _CALL_NOT_IN_CACHE as e:
+                pass
+
+            calls = fun(*args, **kwargs) # this can be long
+
+            if cache_result:
+                calls |= call_fn_cache.signature\
+                    (kwargs = {'call_serialiser': call_serialiser,
+                               'cache_kwargs': cache_kwargs,
+                               'ofn': str(ofn_rpath)})
+
+            # call_fn_cache is actually run after the "sc"
+            sc(calls = calls, ofn = call_fn.path)
+            return calls
+
+        wrap._cache_args = \
+            {'call_serialiser': call_serialiser,
+             '_save_call': sc._cache_args}
         wrap._cache_args.update\
             (_function_defaults\
              (_check_in_storage, **cache_kwargs))
         return wrap
-    return wrapper
-
-
-@cache_fn_results(ofn_arg='ofn')
-def _save_calls(calls, ofn):
-    try:
-        with open(ofn, 'w') as f:
-            json.dump(calls, f)
-        return ofn
-    except Exception as e:
-        remove_file(ofn)
-        raise e
-
-
-def _results2pickle(fun):
-    """Pickle results to a storage
-
-    """
-    @wraps(fun)
-    def wrap(*args, **kwargs):
-        res = fun(*args, **kwargs)
-
-        ofn = get_tempfile()
-        try:
-            with open(ofn, 'wb') as f:
-                pickle.dump(res, f)
-        except Exception as e:
-            remove_file(ofn)
-            raise e
-
-        return ofn
-    return wrap
-
-
-def _pickle2results(fun):
-    """Get a pickled file and load it
-
-    """
-    @wraps(fun)
-    def wrap(*args, **kwargs):
-        ifn = fun(*args, **kwargs)
-
-        ifn = RemoteStoragePath(ifn).get_locally()
-        with open(ifn, 'rb') as f:
-            return pickle.load(f)
-    return wrap
-
-
-def call_cache_fn_results(storage_type = DEFAULT_REMOTE,
-                          **cache_kwargs):
-    """Wraps tasks generation calls (*/calls.py)
-
-    This adds an additional task to the queue, that sets the result of
-    the call to the cache
-
-    :storage_type: type of remote storage.
-
-    :check_storage_kwargs: see optional arguments of
-    ?cu.cache.cache._check_in_storage
-
-    """
-    def wrapper(fun):
-        @wraps(fun)
-        def wrap(*args, **kwargs):
-            isin, ofn, ofn_rpath, minage = \
-                matchargs(_check_in_storage)\
-                (fun = fun, args = args, kwargs = kwargs,
-                 storage_type = storage_type,
-                 **cache_kwargs)
-
-            if isin:
-                return call_fn_cache.signature\
-                    (kwargs = {'result': None,
-                               'ofn': str(ofn_rpath),
-                               'storage_type': storage_type})
-
-            call_fn = RemoteStoragePath\
-                (ofn + '_call.json',
-                 remotetype=storage_type)
-            if call_fn.in_storage() and \
-               ifpass_minage(minage, call_fn.get_timestamp(),
-                             kwargs):
-                with open(call_fn.get_locally(), 'r') as f:
-                    return celery.signature(json.load(f))
-
-            calls = fun(*args, **kwargs) # this can be long
-            calls |= call_fn_cache.signature\
-                (kwargs = {'ofn': str(ofn_rpath),
-                           'storage_type': storage_type})
-            _save_calls(calls = calls, ofn = call_fn.path)
-            return calls
-
-        wrap._cache_args = \
-            {'storage_type': storage_type}
-        wrap._cache_args.update\
-            (_function_defaults\
-             (_check_in_storage, **check_storage_kwargs))
-        return wrap
-    return wrapper
-
-
-def cache_pickle_results(**kwargs):
-    """Cache results of a function that returns a pickable object
-
-    :kwargs: see ?cu.cache.cache.cache_fn_results
-
-    """
-    def wrapper(fun):
-        return _pickle2results(cache_fn_results(**kwargs)\
-                               (_results2pickle(fun)))
-    return wrapper
-
-
-def cache(output = 'fn', **kwargs):
-    """Wrapper for cache_fn_results, call_cache_fn_results,
-    cache_pickle_results
-
-    :output: either 'fn', 'call', 'pickle'
-    'output' specifies what is expected from the function:
-        - 'fn' expects a local path to be cached
-        - 'call' expects celery.task
-        - 'pickle' expects a pickable objects
-
-    :kwargs: depending on the output, see
-       - 'fn': ?cu.cache.cache.cache_fn_results
-       - 'call': ?cu.cache.cache.call_cache_fn_results
-       - 'pickle': ?cu.cache.cache.cache_pickle_results
-
-    """
-    def wrapper(fun):
-        if 'fn' == output:
-            return matchargs(cache_fn_results)(**kwargs)(fun)
-        elif 'call' == output:
-            return matchargs(call_cache_fn_results)(**kwargs)(fun)
-        elif 'pickle' == output:
-            return matchargs(cache_pickle_results)(**kwargs)(fun)
-        else:
-            raise RuntimeError\
-                ("cache: invalid argument output = {}"\
-                 .format(output))
     return wrapper

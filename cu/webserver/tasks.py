@@ -28,7 +28,7 @@ from cu.exceptions \
     import RETRY_GENERATE_TASK_QUEUE
 
 
-@task(cache = None, debug_info = True,
+@task(cache = False, get_args_locally = False,
       autoretry_for = [RETRY_GENERATE_TASK_QUEUE])
 def generate_task_queue(call_string, args):
     """Generate processing queue and start the task
@@ -49,7 +49,7 @@ exception on error
 
     try:
         job = call(**args)
+        return job.delay().task_id
     except call_retry as e:
         raise RETRY_GENERATE_TASK_QUEUE("{}".format(e)) from e
 
-    return job.delay().task_id

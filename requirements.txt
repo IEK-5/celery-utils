@@ -4,5 +4,6 @@ diskcache
 filelock
 flower
 gunicorn
+msgpack
 pytest
 python-dateutil
