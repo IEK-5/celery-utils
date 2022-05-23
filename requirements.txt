@@ -1,5 +1,5 @@
 bottle
-celery[redis]
+celery[msgpack,redis]
 diskcache
 filelock
 flower

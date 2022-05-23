@@ -75,6 +75,10 @@ CELERY_APP = celery.Celery\
      enable_utc = True)
 CELERY_APP.autodiscover_tasks(['cu.cache','cu.webserver'])
 
+CELERY_APP.conf.task_serializer = 'msgpack'
+CELERY_APP.conf.result_serializer = 'msgpack'
+CELERY_APP.conf.accept_content = ['application/json', 'application/x-msgpack']
+
 ALLOWED_REMOTE = CONFIGS['remotestorage']['use_remotes']
 ALLOWED_REMOTE, _LOCAL_STORAGE_ROOTS = \
     _set_localmount(CONFIGS, ALLOWED_REMOTE)
