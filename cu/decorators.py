@@ -91,7 +91,7 @@ def task(cache = 'fn', get_args_locally = True,
         if hasattr(fun, '_cache_args'):
             attr.update(fun._cache_args)
 
-        bs_cls = AddAttr(**kwargs)(celery.Task)
+        bs_cls = AddAttr(**attr)(celery.Task)
         bs_cls = matchargs(AddRetry)(**kwargs)(bs_cls)
 
         @CELERY_APP.task(bind = True, queue = queue, base = bs_cls)
