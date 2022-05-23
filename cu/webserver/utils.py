@@ -177,6 +177,9 @@ def _method_results(method, args):
     if isinstance(job_id, dict):
         return job_id
 
+    if isinstance(job_id, str) and is_remote_path(job_id):
+        return job_id
+
     tasks_queues[(method, args)] = job_id
 
     return get_job_results\

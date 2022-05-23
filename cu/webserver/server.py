@@ -38,6 +38,9 @@ from cu.webserver.utils \
     import format_help, return_exception, \
     call_method, parse_args, serve
 
+from cu.webserver.upload \
+    import upload_request_data
+
 
 def _check_allowed(method):
     if not isinstance(CONFIGS['app']['allowed_imports'], list):
@@ -60,12 +63,19 @@ def _method2module(method):
     return import_function(method)
 
 
+def _process_request_files(request_files):
+    res = {}
+    for fn in request_files.keys():
+        res[fn] = upload_request_data(request_files[fn])
+    return res
+
+
 @bottle.error(404)
 def error404(error):
     return {'results': str(error)}
 
 
-@bottle.route('/api/help/<method:path>', method=['GET'])
+@bottle.route('/api/help/<method:path>', method=['GET','POST'])
 def get_help(method):
     res = calldocs(_method2module(method))
     return {'results': format_help(res)}
@@ -73,13 +83,16 @@ def get_help(method):
 
 @bottle.route('/api/<method_str:path>', method=['GET','POST'])
 def do_method(method_str):
-    if 'GET' == bottle.request.method:
-        args = bottle.request.query
-    elif 'POST' == bottle.request.method:
-        args = bottle.request.json
-    else:
-        return error404('%s access method is not implemented' \
-                        % str(bottle.request.method))
+    args = {}
+
+    if bottle.request.query:
+        args.update(bottle.request.query)
+    if bottle.request.json:
+        args.update(bottle.request.json)
+    if bottle.request.params:
+        args.update(bottle.request.params)
+    if bottle.request.files:
+        args.update(_process_request_files(bottle.request.files))
 
     try:
         method = _method2module(method_str)
@@ -91,9 +104,6 @@ def do_method(method_str):
     # TODO: set correctly the serve_type
     # serve_type = args['serve_type']
     # del args['serve_type']
-
-    # TODO: special treatment should be for /upload
-    # bottle.request.files.data to pass to upload() correctly?
 
     return serve(call_method(method=method_str, args=args),
                  serve_type = 'file')

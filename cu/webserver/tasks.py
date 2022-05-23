@@ -49,7 +49,9 @@ exception on error
 
     try:
         job = call(**args)
-        return job.delay().task_id
+        if hasattr(job, "delay"):
+            return job.delay().task_id
+        return job
     except call_retry as e:
         raise RETRY_GENERATE_TASK_QUEUE("{}".format(e)) from e
 

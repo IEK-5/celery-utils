@@ -85,7 +85,8 @@ ALLOWED_REMOTE, _LOCAL_STORAGE_ROOTS = \
 DEFAULT_REMOTE = CONFIGS['remotestorage']['default']
 
 CACHE_ODIR = CONFIGS['localcache']['path']
-
+UPLOADS_DIR = os.path.join(CACHE_ODIR,
+                           CONFIGS['webserver']['uploads_dir'])
 
 def get_Tasks_Queues():
     return Redis_Dictionary\

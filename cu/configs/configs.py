@@ -131,13 +131,18 @@ _CONFIGS['webserver'] = dict(
     port = 8123,
     workers = 2,
     max_requests = 100,
-    timeout = 20)
+    timeout = 20,
+    uploads_dir = 'uploads')
 _CONFIGS['__help__webserver'] = dict(
     host = """ip address for a webserver to listen requests to""",
     port = """port for a webserver to listen requests to""",
     workers = """number of workers for a webserver""",
     max_requests = """maximum number of requests before webserver gives up""",
-    timeout = """timeout for a webserver request""")
+    timeout = """timeout for a webserver request""",
+    uploads_dir = """directory where uploads are stored
+
+    The directory is resolved relative to
+    CONFIGS['localcache']['path']""")
 
 _CONFIGS['logging'] = dict(
     path = 'data/logs',

@@ -20,7 +20,7 @@ import os
 import hashlib
 
 from cu.app \
-    import CACHE_ODIR
+    import UPLOADS_DIR
 
 from cu.cache.cache \
     import cache_fn
@@ -44,21 +44,33 @@ def _upload_file(fn, name):
     return fn
 
 
-def upload(request_data):
-    # TODO: this does not exposes /api/cu/upload correctly
+def upload_request_data(request_data):
     ofn = get_tempfile()
 
     try:
         request_data.save(ofn, overwrite = True)
-        # TODO: this needs to be done via CONFIGS?
-        # use full_fn_name
         name = os.path.join\
-            (CACHE_ODIR, "cu", "upload", _hash_file(ofn))
-        name = _upload_file(fn = ofn, name = name)
-        return {'storage_fn': name}
+            (UPLOADS_DIR, _hash_file(ofn))
+        return _upload_file(fn = ofn, name = name)
     finally:
-        remote_file(ofn)
+        remove_file(ofn)
 
 
-def download(fn):
+def upload(fn = 'NA'):
+    """Upload a file to a storage
+
+    The prefix for the storage is specified in CONFIGS['webserver']['uploads_dir']
+
+    :fn: filename path. With curl, say 'curl -F fn=@local_file ...'
+
+    """
+    return {'storage_fn': fn}
+
+
+def download(fn = 'NA'):
+    """Download a file from a storage
+
+    :fn: remote storage path
+
+    """
     return fn
