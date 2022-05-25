@@ -27,6 +27,8 @@ from cu.utils.float_hash \
     import float_hash
 
 
+# _full_fn_name is only applicable for true function, and not
+# decorated celery tasks
 def _full_fn_name(fun):
     res = inspect.getmodule(fun)
     return os.path.join(*res.__name__.split('.'), fun.__name__)
