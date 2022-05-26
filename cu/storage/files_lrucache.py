@@ -22,6 +22,35 @@ import logging
 import diskcache
 
 
+def _fn2ino(fn):
+    """Read as 'filename to inode'
+
+    Used as keys for the part of the dictionary that maps filenames to
+    the inode.
+
+    """
+    return "fn2ino://{}".format(fn)
+
+
+def _c_ino(ino):
+    """Read as 'count inodes'
+
+    Used as keys for the part of the dictionary that files with the
+    give inode.
+
+    """
+    return "c_ino://{}".format(ino)
+
+
+def _s_ino(ino):
+    """Read as 'size of inode'
+
+    Used as keys for keeping track of sizes of inodes.
+
+    """
+    return "s_ino://{}".format(ino)
+
+
 class Files_LRUCache:
 
 
@@ -44,68 +73,137 @@ class Files_LRUCache:
         path = os.path.join(self.path,"_Files_LRUCache")
         self._deque = diskcache.Deque\
             (directory = path + '_deque')
-        self._sizes = diskcache.Cache\
+        self._cache = diskcache.Cache\
             (directory = path + '_cache',
              size_limit = (1024**3))
-        self._lock = diskcache.RLock(self._sizes, '_lock')
+
+        self._lock = diskcache.RLock(self._cache, '_lock')
 
         with self._lock:
-            if 'total' not in self._sizes:
-                self._sizes['total'] = 0
-            if 'checked_at' not in self._sizes:
-                self._sizes['checked_at'] = time.time()
+            if 'total' not in self._cache:
+                self._cache['total'] = 0
+            if 'checked_at' not in self._cache:
+                self._cache['checked_at'] = time.time()
 
 
-    def _remove_from_sizes(self, item):
-        if ('file://' + item) in self._sizes:
-            self._sizes['total'] -= \
-                self._sizes['file://' + item]
-            del self._sizes['file://' + item]
+    def _inc_c_ino(self, ino):
+        c = _c_ino(ino)
+
+        if c not in self._cache:
+            self._cache[c] = 1
+            return True
+
+        self._cache[c] += 1
+        return self._cache[c] == 1
+
+
+    def _dec_c_ino(self, ino):
+        c = _c_ino(ino)
+
+        if c not in self._cache:
+            return False
+
+        self._cache[c] -= 1
+
+        if self._cache[c] < 0:
+            logging.warning("something is fishy! self._cache[c] < 0")
+            self._cache[c] = 0
+
+        if 0 == self._cache[c]:
+            del self._cache[c]
             return True
 
         return False
+
+
+    def _add_size(self, ino, size):
+        s = _s_ino(ino)
+
+        if s in self._cache and size == self._cache[s]:
+            return
+
+        self._cache['total'] += size
+
+        if s not in self._cache:
+            self._cache[s] = size
+            return
+
+        if size != self._cache[s]:
+            self._cache['total'] -= self._cache[s]
+            self._cache[s] = size
+
+
+    def _remove_size(self, ino):
+        s = _s_ino(ino)
+
+        if s not in self._cache:
+            return False
+
+        self._cache['total'] -= self._cache[s]
+        del self._cache[s]
+        return True
+
+
+    def _remove_fn(self, fn):
+        f = _fn2ino(fn)
+
+        if f not in self._cache:
+            return False
+
+        if self._dec_c_ino(self._cache[f]):
+            self._remove_size(self._cache[f])
+        del self._cache[f]
+
+        return True
+
+
+    def _add_fn(self, fn):
+        f = _fn2ino(fn)
+
+        if not os.path.exists(fn):
+            # case, when file does not exist/disappeared
+            if self._remove_fn(fn):
+                self._deque.remove(fn)
+            return
+
+        ino = os.stat(fn).st_ino
+        size = os.stat(fn).st_size
+
+        # case when fn is seen the first time
+        if f not in self._cache:
+            self._inc_c_ino(ino)
+
+        # the case, when inode of filename has been changed
+        if f in self._cache and self._cache[f] != ino:
+            self._inc_c_ino(ino)
+            if self._dec_c_ino(self._cache[f]):
+                self._remove_size(self._cache[f])
+
+        # this updates the size of the ino
+        self._add_size(ino, size)
+        self._cache[f] = ino
 
 
     def check_content(self):
         """Check content of lists and remove deleted files
         """
         with self._lock:
-            [self._update_sizes(p) for p in self._deque]
+            [self._add_fn(p) for p in self._deque]
 
 
-    def _update_order(self, item):
-        if item in self._deque:
-            self._deque.remove(item)
-        self._deque.append(item)
+    def _update_order(self, fn):
+        if fn in self._deque:
+            self._deque.remove(fn)
+        self._deque.append(fn)
 
 
-    def _update_sizes(self, item):
-        if not os.path.exists(item):
-            if self._remove_from_sizes(item):
-                # here only if something was deleted from _sizes
-                self._deque.remove(item)
-            return
 
-        size = os.stat(item).st_size
+    def _update(self, fn):
+        self._update_order(fn)
+        self._add_fn(fn)
 
-        if ('file://' + item) not in self._sizes:
-            self._sizes['total'] += size
-            self._sizes['file://' + item] = size
-            return
-
-        if self._sizes['file://' + item] != size:
-            self._sizes['total'] += \
-                size - self._sizes['file://' + item]
-            self._sizes['file://' + item] = size
-            return
-
-
-    def _update(self, item):
-        self._update_order(item)
-        self._update_sizes(item)
-
-        if (time.time() - self._sizes['checked_at']) > self.check_every:
-            self._sizes['checked_at'] = time.time()
+        if (time.time() - self._cache['checked_at']) > self.check_every:
+            self._cache['checked_at'] = time.time()
             self.check_content()
 
 
@@ -119,20 +217,20 @@ class Files_LRUCache:
 
         """
         with self._lock:
-            while self._sizes['total'] >= self.maxsize \
+            while self._cache['total'] >= self.maxsize \
                   and len(self._deque) > 0:
                 self.popleft()
             self._update(fn)
 
 
-    def __contains__(self, item):
-        if item not in self._deque:
+    def __contains__(self, fn):
+        if fn not in self._deque:
             return False
 
         with self._lock:
-            self._update(item)
+            self._update(fn)
 
-        if not os.path.exists(item):
+        if not os.path.exists(fn):
             return False
 
         return True
@@ -145,7 +243,7 @@ class Files_LRUCache:
     def size(self):
         """Return total used space in bytes
         """
-        return self._sizes['total']
+        return self._cache['total']
 
 
     def popleft(self):
@@ -154,17 +252,17 @@ class Files_LRUCache:
         Popping tries to delete the tracked by cache file.
         """
         with self._lock:
-            item = self._deque.popleft()
+            fn = self._deque.popleft()
             try:
-                os.remove(item)
+                os.remove(fn)
             except:
                 pass
 
-            self._remove_from_sizes(item)
+            self._remove_fn(fn)
             logging.debug("""
             file is removed from cache: {}
             Files_LRUCache size: {:.5f} GB
             Files_LRUCache usage: {:.2%}
-            """.format(item, self.size()/(1024**3),
+            """.format(fn, self.size()/(1024**3),
                        self.size() / self.maxsize))
-            return item
+            return fn

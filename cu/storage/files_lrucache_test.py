@@ -140,7 +140,110 @@ def test_Files_LRUCache_contains():
         shutil.rmtree(path)
 
 
-def test_Files_LRUCache_large_number_of_files(N = int(1e+3)):
+def test_Files_LRUCache_changed_inode():
+    path="test_Files_LRUCache_changed_inode"
+    try:
+        os.makedirs(path, exist_ok = True)
+        cache = Files_LRUCache(maxsize = 2*1024/(1024**3), path = path)
+
+        p = os.path.join(path, str(0) + "_test_file")
+        touch(p)
+        cache.add(p)
+
+        assert 1024 == cache.size()
+        assert 1 == len(cache)
+
+        p1 = os.path.join(path, str(1) + "_test_file")
+        touch(p1, size=2048)
+        os.replace(p1, p)
+
+        assert 1024 == cache.size()
+        assert 1 == len(cache)
+        assert True == (p in cache)
+        assert 2048 == cache.size()
+        assert 1 == len(cache)
+    finally:
+        shutil.rmtree(path)
+
+
+def test_Files_LRUCache_hardlinks():
+    path="test_Files_LRUCache_hardlinks"
+    try:
+        os.makedirs(path, exist_ok = True)
+        cache = Files_LRUCache(maxsize = 2*1024/(1024**3), path = path)
+
+        p = os.path.join(path, str(0) + "_test_file")
+        touch(p)
+        cache.add(p)
+
+        assert 1024 == cache.size()
+        assert 1 == len(cache)
+
+        pl = os.path.join(path, str(1) + "_test_file")
+        os.link(p, pl)
+        cache.add(pl)
+
+        assert 1024 == cache.size()
+        assert 2 == len(cache)
+    finally:
+        shutil.rmtree(path)
+
+
+def test_Files_LRUCache_hardlinks_little_space():
+    path="test_Files_LRUCache_hardlinks_little_space"
+    try:
+        os.makedirs(path, exist_ok = True)
+        cache = Files_LRUCache(maxsize = 1*1024/(1024**3), path = path)
+
+        p = os.path.join(path, str(0) + "_test_file")
+        touch(p)
+        cache.add(p)
+
+        assert 1024 == cache.size()
+        assert 1 == len(cache)
+
+        pl = os.path.join(path, str(1) + "_test_file")
+        os.link(p, pl)
+        cache.add(pl)
+
+        assert 1024 == cache.size()
+        assert 1 == len(cache)
+    finally:
+        shutil.rmtree(path)
+
+
+def test_Files_LRUCache_hardlinks_changing_size(N=100):
+    path="test_Files_LRUCache_hardlinks_changing_size"
+    try:
+        os.makedirs(path, exist_ok = True)
+        cache = Files_LRUCache(maxsize = 2*1024/(1024**3), path = path)
+
+        p = os.path.join(path, str(0) + "_test_file")
+        touch(p)
+        cache.add(p)
+
+        for i in range(1,N):
+            pl = os.path.join(path, str(i) + "_test_file")
+            os.link(p, pl)
+            cache.add(pl)
+
+        assert 1024 == cache.size()
+        assert N == len(cache)
+
+        touch(p, size=2048)
+        # as cache not updated
+        assert 1024 == cache.size()
+        assert N == len(cache)
+
+        # the following updates the cache
+        assert True == (p in cache)
+        assert 2048 == cache.size()
+        assert N == len(cache)
+    finally:
+        shutil.rmtree(path)
+
+
+def test_Files_LRUCache_large_number_of_files(N=100):
     path="test_Files_LRUCache_large_number_of_files"
     try:
         os.makedirs(path, exist_ok = True)
