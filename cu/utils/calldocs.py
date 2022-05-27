@@ -107,10 +107,12 @@ def _deduce_calldocs(fun, options):
 
 
 def calldocs(fun, calldocs_options = {}, calldocs_tail = []):
-    res = {}
+    res = {'header': '', 'args': {}}
 
     for f in calldocs_tail[::-1]:
-        res.update(_deduce_calldocs(f,{}))
+        res['args'].update(_deduce_calldocs(f,{})['args'])
 
-    res.update(_deduce_calldocs(fun, calldocs_options))
+    x = _deduce_calldocs(fun, calldocs_options)
+    res['args'].update(x['args'])
+    res['header'] = x['header']
     return res
