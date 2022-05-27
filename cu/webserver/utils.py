@@ -26,7 +26,8 @@ from celery.result \
     import AsyncResult
 
 from cu.storage.remotestorage_path \
-    import searchandget_locally, is_remote_path
+    import searchandget_locally, is_remote_path, \
+    RemoteStoragePath
 
 from cu.exceptions \
     import TASK_RUNNING
@@ -108,6 +109,8 @@ def serve(data, serve_type = 'file'):
                 return f.read()
         elif 'path' == serve_type:
             return {'storage_fn': data}
+        elif 'deserialise' == serve_type:
+            return {'results': RemoteStoragePath(data).get_locally(True)}
         else:
             raise RuntimeError('unknow serve_type = {}'\
                                .format(serve_type))

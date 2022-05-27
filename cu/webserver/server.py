@@ -42,6 +42,24 @@ from cu.webserver.upload \
     import upload_request_data
 
 
+_webserver_args = {
+    'serve_type': \
+    ('file',
+     """what webserver outputs
+
+     options:
+         - 'file': binary data
+
+         - 'path': {"storage_fn": <remote storage path>}
+
+         - 'deserialise': {"results": <deserialised data>}
+
+           if remote storage path serialised data, then the webserver
+           will attempt to deserialise it and sends it back. Note,
+           only json-serialisable data can be sent over the
+           webserver.""")}
+
+
 def _check_allowed(method):
     if not isinstance(CONFIGS['app']['allowed_imports'], list):
         raise RuntimeError\
@@ -77,7 +95,12 @@ def error404(error):
 
 @bottle.route('/api/help/<method:path>', method=['GET','POST'])
 def get_help(method):
-    res = calldocs(_method2module(method))
+    try:
+        res = calldocs(_method2module(method))
+        res['args'].update(_webserver_args)
+    except Exception as e:
+        return return_exception(e)
+
     return {'results': format_help(res)}
 
 
@@ -97,16 +120,18 @@ def do_method(method_str):
     try:
         method = _method2module(method_str)
         defaults = calldocs(method)['args']
+        defaults.update(_webserver_args)
         args = parse_args(data = args, defaults = defaults)
     except Exception as e:
         return return_exception(e)
 
-    # TODO: set correctly the serve_type
-    # serve_type = args['serve_type']
-    # del args['serve_type']
+    webserver_args = {}
+    for k in _webserver_args.keys():
+        webserver_args[k] = args[k]
+        del args[k]
 
     return serve(call_method(method=method_str, args=args),
-                 serve_type = 'file')
+                 **webserver_args)
 
 
 bottle.run(host=CONFIGS['webserver']['host'],
